@@ -2,7 +2,7 @@
 """
 Created on Thu Oct 17 11:04:30 2019
 
-@author: paula
+@author: paulac
 """
 
 import serial, time
@@ -24,25 +24,12 @@ import pickle
 
 #%% Communicate with arduino
 
-arduino = serial.Serial('/dev/ttyACM0', 9600)
-#arduino = serial.Serial('/COM3', 9600)
-
-#%% Test arduino communication
-
-#message = ";S%c;F%c;N%c;A%d;I%d;n%d;X" % ('R', 'L','B', 3, 500, 10)
-#arduino.write(message)
-#
-## after test message, get the data sent from arduino since with just flushing wont work correctly after.
-#data_test = []
-#aux_test = arduino.readline()
-#while (aux_test[0]!='E'):
-#    data_test.append(aux_test);
-#    aux_test = arduino.readline();
+arduino = serial.Serial('COM4', 9600)
 
 #%% Conditions
 
 # filename for file that will contain all possible conditions permutations
-filename_orders = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/Posibles_permutaciones_condiciones_probando.dat'
+filename_orders = './Data/Posibles_permutaciones_condiciones_probando.dat'
 
 # all possible conditions for stimulus and feedback
 all_conditions = [['L','L'], ['L','R'], ['L','N'], ['R','L'], ['R','R'], ['R','N'], ['B','L'], ['B','R'], ['B','N'],['B','B']];
@@ -50,22 +37,22 @@ all_conditions = [['L','L'], ['L','R'], ['L','N'], ['R','L'], ['R','R'], ['R','N
 # condition dictionary so we can choose the condition without going through number position
 condition_dictionary = {"LL": 0,"LR": 1,"LN": 2,"RL": 3,"RR": 4,"RN": 5,"BL": 6,"BR": 7,"BN": 8,"BB": 9};
 
-binary_response = raw_input("Es la primera vez que corres este experimento/piloto? [y/n] ") 
+binary_response = input("Es la primera vez que corres este experimento/piloto? [y/n] ") 
 
 # if this is the first time running the experiment, then it's necessary to generate the file with all possible permutations
 if binary_response == 'y':
-    raw_input("Elija las condiciones que quiere usar separandolas por Enters. Al finalizar vuelva a presionar Enter.")
-
+    
     # vector that will contain all conditions needed for this experiment    
     inputs = []
-    while True:
-        inp = raw_input()
+    inp = input("Elija las condiciones que quiere usar separandolas por Enters. Al finalizar vuelva a presionar Enter.\n")
+    while inp != "":
+        inputs.append(inp)  
+        inp = input()
         if inp == "":
             break
-        inputs.append(inp)   
         
     # finding the conditions index in the dictionary
-    conditions_chosen_index = []
+    conditions_chosen_index = []    
     for condition in inputs:
         conditions_chosen_index.append(condition_dictionary[condition])
         
@@ -74,7 +61,7 @@ if binary_response == 'y':
     # save them in a file
     with open(filename_orders, 'wb') as fp:
         pickle.dump(all_possible_orders_conditions, fp)
-    
+
 # if this isn't the first time running the experiment, the file with all possible permutations should already exist and have the information of the permutations already used by subjects (those permutations will no longer be in the file)
 else:
     # try to find the file. If it doesn't exist in the directory, raise an error.
@@ -98,7 +85,7 @@ with open (filename_orders, 'rb') as fp:
 # total number of blocks (equal to number of conditions since we have one condition per block)
 N_blocks = len(content[0]);
 # number of trials per condition per block
-N_trials_per_block_per_cond = 1;
+N_trials_per_block_per_cond = 2;
 
 # Define Python user-defined exceptions
 class Error(Exception):
@@ -108,7 +95,7 @@ class Error(Exception):
 #%% Experiment
 
 # check for file with names and pseudonyms
-filename_names = "/home/paula/Tappingduino3/tappingduino-3-master/Datos/Dic_names_pseud.dat"
+filename_names = "C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\Dic_names_pseud.dat"
 
 try:
     f_names = open(filename_names,"r")
@@ -127,7 +114,7 @@ except IOError:
     raise
 
 # set subject name for filename
-name = raw_input("Ingrese su nombre: ") 
+name = input("Ingrese su nombre: ") 
 
 f_names = open(filename_names,"a")
 f_names.write('\n'+name+'\tS'+next_subject_number)
@@ -135,6 +122,7 @@ f_names.close()
 
 with open (filename_orders, 'rb') as fp:
     content = pickle.load(fp)
+    print(fp)
     
 cond_order_block = random.choice(content)
 
@@ -161,7 +149,7 @@ while (block_counter < N_blocks):
         Fdbk_conds.append(condition_vector[i][1])
     
     # run one block
-    raw_input("Presione Enter para comenzar el bloque (%d/%d)" %  (block_counter+1,N_blocks));
+    input("Presione Enter para comenzar el bloque (%d/%d)" %  (block_counter+1,N_blocks));
     
     # set time for file name
     timestr = time.strftime("%Y_%m_%d-%H.%M.%S")
@@ -174,20 +162,22 @@ while (block_counter < N_blocks):
     errors = [] # vector that will contain the type of error that ocurred if any did    
     
     # generate filename for file that will contain all conditions used in the trial along with the valid_trials vector    
-    filename_block = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials" 
+    #filename_block = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials" 
+    filename_block = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials"
     
     while (trial < N_trials_per_block):
-        raw_input("Presione Enter para comenzar el trial (%d/%d)" % (trial+1,N_trials_per_block));
+        input("Presione Enter para comenzar el trial (%d/%d)" % (trial+1,N_trials_per_block));
         plt.close(1)
         plt.close(2)
         
         # generate raw data file 
-        filename_raw = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)+"-raw.dat"
+        filename_raw = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)+"-raw.dat"
         f_raw = open(filename_raw,"w+")
      
         # generate extracted data file name (will save raw data, stimulus time, feedback time and asynchrony)
-        filename_data = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)
-            
+        #filename_data = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)
+        filename_data = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)    
+        
         # wait random number of seconds before actually starting the trial
         wait = random.randrange(10,20,1)/10.0
         time.sleep(wait)
@@ -197,20 +187,24 @@ while (block_counter < N_blocks):
         Resp = Fdbk_conds[trial];
           
         # send message with conditions to arduino
-        message = ";S%c;F%c;N%c;A%d;I%d;n%d;X" % (Stim, Resp,'B', 3, ISI, n_stim)
+        perturb_size = 100
+        perturb_bip = 15
+        perturb_type = 2
+        message = str.encode(";S%c;F%c;N%c;A%d;I%d;n%d;P%d;B%d;T%d;X" % (Stim, Resp,'B', 3, ISI, n_stim, perturb_size, perturb_bip, perturb_type))   #MODIF ADS
         arduino.write(message)
         conditions.append(message)
         #time.sleep(25)            
 
         # read information from arduino
         data = []
-        aux = arduino.readline()
+        #aux = arduino.readline()
+        aux = arduino.readline().decode()
         while (aux[0]!='E'):
-            data.append(aux);
-            f_raw.write(aux); # save raw data
-            aux = arduino.readline();
-
-        
+            data.append(aux)
+            f_raw.write(aux) # save raw data
+            #aux = arduino.readline();
+            aux = arduino.readline().decode()
+                   
         # Separates data in type, number and time
         e_total = len(data)
         e_type = []
@@ -403,8 +397,8 @@ while (block_counter < N_blocks):
     print("Fin del bloque!")
 
     # ask subject what condition of stimulus and responses considers he/she heard
-    stim_subject_percep = raw_input("Considera que el estimulo llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
-    fdbk_subject_percep = raw_input("Considera que su respuesta llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
+    stim_subject_percep = input("Considera que el estimulo llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
+    fdbk_subject_percep = input("Considera que su respuesta llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
     block_cond_subject_percep = [stim_subject_percep, fdbk_subject_percep]
     
     # SAVE DATA FROM BLOCK (VALID AND INVALID TRIALS AND THEIR CONDITIONS)    
@@ -470,10 +464,12 @@ def Loading_data(subject_number,block, trial, *asked_data):
     # Hay que darle si o si numero de sujeto y bloque y el trial puede estar especificado o ser None. Recordar que los archivos que no tienen identificado el trial tienen guardada la informacion de todo el bloque: condicion usada, errores, percepcion del sujeto y si el trial fue valido o invalido. En cambio, al especificar el trial se tiene la informacion de cada trial particular, es decir, asincronias, datos crudos, respuestas y estimulos.
 
     if trial is None:
-        file_to_load = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trials.npz")
-       # file_to_load = glob.glob('/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+subject_number+"*-block"+str(block)+"-trials.npz")    
+        #file_to_load = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trials.npz")
+        # file_to_load = glob.glob('/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+subject_number+"*-block"+str(block)+"-trials.npz")
+        file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trials.npz")
     else:
-        file_to_load = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
+        #file_to_load = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
+        file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")
     
         #file_to_load = glob.glob('/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
     
@@ -501,7 +497,7 @@ plt.grid()
 
 # Loads all asynchronies for a subject for an specific block and returns all plots
 def Loading_asynch(subject_number,block):
-    file_to_load = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trials.npz")
+    file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trials.npz")
     #file_to_load = glob.glob('/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+subject_number+"*-block"+str(block)+"-trials.npz")    
     npz = np.load(file_to_load[0])
     trials = npz['trials']
@@ -512,8 +508,9 @@ def Loading_asynch(subject_number,block):
             valid_index.append(i)
     
     for trial in valid_index:
-        file_to_load_trial = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
+        #file_to_load_trial = glob.glob(r'C:\Users\Paula\Documents\Facultad\Tesis de licenciatura\tappingduino 3\Codigo\2020\DATOS/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
         # file_to_load_trial = glob.glob('/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")    
+        file_to_load_trial = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz") 
         npz_trial = np.load(file_to_load_trial[0])
         asynch_trial = npz_trial['asynch']
         plt.plot(asynch_trial,'.-', label = 'trial %d' % trial)

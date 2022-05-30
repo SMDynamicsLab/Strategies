@@ -16,7 +16,7 @@ Para que el código funcione correctamente, el archivo .pkl que devuelve
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import pingouin as pg
+#import pingouin as pg                 //COMENTADO ADS 20/04
 from scipy.stats import ttest_rel
 
 # %% Cargo el archivo que salió de LimpiezaDatos.py
@@ -77,7 +77,8 @@ def par_stimfdbk(cond):
 # %% PLOT FINAL i: asyn vs bip single trial de un sujeto muestra (sujeto 1 en
 # este caso) en BB.
 
-asynch = data['BB']['sujeto 1'].loc['trial11']
+#asynch = data['BB']['sujeto 1'].loc['trial11']
+asynch = data['BB']['sujeto 1'].loc['trial0']
 
 asynch.plot(use_index=False, style='.-', figsize=(10, 8))
 plt.xlabel('# bip', fontsize=18)
@@ -98,6 +99,15 @@ data[condition][subject].T.plot(use_index=False,
                                 style='.-',
                                 color=cbPaleta,
                                 figsize=(10, 8))
+
+trialBB = data[condition][subject]
+trialBB_promedio = trialBB.mean()
+trialBB_promedio.T.plot(use_index=False,
+                        label='Promedio',
+                        style='.-',
+                        color=cbPaleta,
+                        figsize=(10, 8))
+
 plt.xlabel('# beep', fontsize=15)
 plt.ylabel('Asincronia[ms]', fontsize=15)
 plt.xticks(fontsize=15)
@@ -121,10 +131,60 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 # plt.savefig('Distrib_Asynch_%s_%s.png' % (subject, condition))
 
+# %% PLOT FINAL iiiB: Todos los trials de un sujeto en LL (Gráfico tipo 1).
+#subject = 'sujeto 2'
+subject = 'sujeto 1'
+condition = 'LL'
+
+# Es necesario trasponer el dataframe (.T) para que los beeps queden en
+# el eje X
+data[condition][subject].T.plot(use_index=False,
+                                style='.-',
+                                color=cbPaleta,
+                                figsize=(10, 8))
+
+trialLL = data[condition][subject]
+trialLL_promedio = trialBB.mean()
+trialLL_promedio.T.plot(use_index=False,
+                        label='Promedio',
+                        style='.-',
+                        color=cbPaleta,
+                        figsize=(10, 8))
+
+plt.xlabel('# beep', fontsize=15)
+plt.ylabel('Asincronia[ms]', fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.grid(True)
+plt.legend()
+plt.title('Todos los trials validos del %s en la condicion %s'
+          % (subject, condition), fontsize=15)
+# plt.savefig('Asynch_%s_%s_alltrials.png' % (subject, condition))
+
+
+# AGREGO DISTRIBUCIÓN DE ASINCRONÍAS
+plt.figure()
+#data['LL']['sujeto 2'].T.stack().plot.hist(bins=30,
+data['LL']['sujeto 1'].T.stack().plot.hist(bins=30,
+                                           figsize=(10, 8),
+                                           color=cbPaleta[5])
+plt.grid()
+plt.xlabel('Asincronia [ms]', fontsize=18)
+plt.ylabel('')
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+# plt.savefig('Distrib_Asynch_%s_%s.png' % (subject, condition))
+
 # %% PLOT FINAL iv: Todos los sujetos un gráfico por cada condición.
 
 condition_vector = ['LL', 'RR', 'BB', 'RL', 'LR']
 total_number_subjects = len(data)
+
+promedioTrialsSujetosLL = 0.0
+promedioTrialsSujetosLR = 0.0
+promedioTrialsSujetosRR = 0.0
+promedioTrialsSujetosRL = 0.0
+promedioTrialsSujetosBB = 0.0
 
 # Los voy a poner a los 5 gráficos en una sola figura como subplots
 fig = plt.figure()
@@ -150,13 +210,60 @@ for condition in condition_vector:
     for subject in range(1, total_number_subjects+1):
         trial = data[condition]['sujeto %i' % subject]
         trial_promedio = trial.mean()
+        
+        if j == 1:
+            promedioTrialsSujetosLL = promedioTrialsSujetosLL + trial_promedio
+        if j == 2:
+            promedioTrialsSujetosLR = promedioTrialsSujetosLR + trial_promedio
+        if j == 3:
+            promedioTrialsSujetosRR = promedioTrialsSujetosRR + trial_promedio
+        if j == 4:
+            promedioTrialsSujetosRL = promedioTrialsSujetosRL + trial_promedio
+        if j == 5:
+            promedioTrialsSujetosBB = promedioTrialsSujetosBB + trial_promedio
+                
         trial_promedio_err = trial.std()/np.sqrt(len(trial_promedio))
         trial_promedio.plot(use_index=False,
                             label='Sujeto %i' % subject,
                             style='.-',
                             color=cbPaleta[subject+4],
                             yerr=trial_promedio_err)
-
+    
+    if j == 1:
+        promedioTrialsSujetosLL = promedioTrialsSujetosLL / total_number_subjects
+        promedioTrialsSujetosLL.plot(use_index=False,
+                                     label='Promedio',
+                                     style='.-',
+                                     color=cbPaleta[9],)
+      
+    if j == 2:
+        promedioTrialsSujetosLR = promedioTrialsSujetosLR / total_number_subjects
+        promedioTrialsSujetosLR.plot(use_index=False,
+                                     label='Promedio',
+                                     style='.-',
+                                     color=cbPaleta[9],)
+        
+    if j == 3:
+        promedioTrialsSujetosRR = promedioTrialsSujetosRR / total_number_subjects
+        promedioTrialsSujetosRR.plot(use_index=False,
+                                     label='Promedio',
+                                     style='.-',
+                                     color=cbPaleta[9],)
+        
+    if j == 4:
+        promedioTrialsSujetosRL = promedioTrialsSujetosRL / total_number_subjects
+        promedioTrialsSujetosRL.plot(use_index=False,
+                                     label='Promedio',
+                                     style='.-',
+                                     color=cbPaleta[9],)
+        
+    if j == 5:
+        promedioTrialsSujetosBB = promedioTrialsSujetosBB / total_number_subjects
+        promedioTrialsSujetosBB.plot(use_index=False,
+                                     label='Promedio',
+                                     style='.-',
+                                     color=cbPaleta[9],)
+    
     plt.axis([-2, 42, -55, 15])
     plt.xlabel('# beep', fontsize=15)
     plt.ylabel('Asincronia[ms]', fontsize=15)
@@ -195,6 +302,7 @@ data_sinBB.T.plot(figsize=(10, 8),
                   style='.-',
                   linewidth=4,
                   markersize=15,
+                  #color=cbPaleta[5:])
                   color=cbPaleta[5:])
 
 # Agrego el promedio entre sujetos
@@ -309,12 +417,12 @@ data_anova['pos_estim'] = data_anova.apply(lambda row:
 # de pingouin)
 data_anova['value'] = pd.to_numeric(data_anova['value'])
 
-# Hago el test de ANOVA de dos factores y medidas repetidas.
-# Lo que nos interesa de tabla_anova es 'F' y 'p-unc'.
-tabla_anova = pg.rm_anova(dv='value',
-                          within=['par_sf', 'pos_estim'],
-                          subject='index',
-                          data=data_anova)
+# Hago el test de ANOVA de dos factores y medidas repetidas.     //COMENTADO ADS 20/04
+# Lo que nos interesa de tabla_anova es 'F' y 'p-unc'.           //COMENTADO ADS 20/04
+#tabla_anova = pg.rm_anova(dv='value',                           //COMENTADO ADS 20/04
+#                          within=['par_sf', 'pos_estim'],       //COMENTADO ADS 20/04
+#                          subject='index',                      //COMENTADO ADS 20/04
+#                          data=data_anova)                      //COMENTADO ADS 20/04
 
 # Plot de interacción entre factores.
 # Nota: existe from statsmodels.graphics.factorplots import interaction_plot
@@ -381,10 +489,10 @@ data_anovastd['value'] = pd.to_numeric(data_anovastd['value'])
 
 # Hago el test de ANOVA de dos factores y medidas repetidas.
 # Lo que nos interesa de tabla_anova es 'F' y 'p-unc'.
-tabla_anovastd = pg.rm_anova(dv='value',
-                             within=['par_sf', 'pos_estim'],
-                             subject='index',
-                             data=data_anovastd)
+#tabla_anovastd = pg.rm_anova(dv='value',                          //COMENTADO ADS 20/04
+#                             within=['par_sf', 'pos_estim'],      //COMENTADO ADS 20/04
+#                             subject='index',                     //COMENTADO ADS 20/04
+#                             data=data_anovastd)                  //COMENTADO ADS 20/04        
 
 # Plot de interacción entre factores.
 plt.figure(figsize=(10, 8))

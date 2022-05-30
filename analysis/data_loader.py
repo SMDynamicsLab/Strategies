@@ -39,7 +39,6 @@ import pandas as pd
 
 # %% DEFINO FUNCIONES
 
-
 def Loading_data(subject_number, block, trial, *asked_data):
     '''
     Carga la información del sujeto y el bloque especificados.
@@ -61,23 +60,43 @@ def Loading_data(subject_number, block, trial, *asked_data):
 
     # Depending on getting "None" or a number for input trial, defines a
     # different filename to load.
+
     if trial is None:
-        file_to_load = glob.glob('Data/S'
-                                 + subject_number_format
-                                 + "*-block"
-                                 + str(block)
-                                 + "-trials.npz")
+#        file_to_load = glob.glob('Data/S'
+        #file_to_load = glob.glob('..\\data\\S'
+        #                         + subject_number_format
+        #                         + "*-block" 
+        #                         + str(block) 
+        #                         + "-trials.npz")
+        
+        #file_to_load = glob.glob('Documents\Ariel\DOCTORADO\DOCTORADO TRABAJANDO\Python\Tappinduino - Python\Data\S' 
+        #                          + subject_number_format 
+        #                          + "*-block" + str(block) 
+        #                          + "-trials.npz")
+        
+        file_to_load = glob.glob('.\Data\S' 
+                                + subject_number_format 
+                                + "*-block" + str(block) 
+                                + "-trials.npz")
+        
+        file_to_load = glob.glob('./Data/S' 
+                                + subject_number_format 
+                                + "*-block" + str(block) 
+                                + "-trials.npz")
+        
     else:
-        file_to_load = glob.glob('Data/S'
+#        file_to_load = glob.glob('Data/S'
+        file_to_load = glob.glob('.\Data\S' 
                                  + subject_number_format
                                  + "*-block"
                                  + str(block)
                                  + "-trial"
                                  + str(trial)
                                  + ".npz")
-
+    
     # Loads the file
     npz = np.load(file_to_load[0])
+    #npz = np.load(file_to_load[0], mmap_mode=None, allow_pickle=True)
     # If the wanted data is not specified, the function prints all the data
     # you can ask for in that file chosen. Else, returns the wanted data.
     if len(asked_data) == 0:
@@ -110,6 +129,7 @@ def Stim_Fdbk_conditions(subject_number):
     condit_subj = []
     # Voy mirando cada bloque y guardando la información en los vectores que
     # acabo de crear. Acá el rango es 5 porque sólo hay 5 condiciones
+    #for i in range(5):
     for i in range(5):
         # Cargo las condiciones en que se realizaron los trials en el bloque i
         conditions = Loading_data(subject_number, i, None, 'conditions')
@@ -250,8 +270,10 @@ def trials_matrix_fun(subject_number, block, condition, valid_index):
     # Won't take all beeps in a trial: gets last N_transit beeps assuring it
     # has disregarded at least 5 at the beginning. That's why we need the
     # asynchronies' vector to have a minimum length
-    N_transit = 40
-    min_len_asynch_vector = N_transit + 5
+    #N_transit = 40
+    N_transit = 4
+    #min_len_asynch_vector = N_transit + 5
+    min_len_asynch_vector = N_transit + 2
 
     trials_matrix = []
     # Search for outliers
@@ -284,15 +306,15 @@ a threshold with respect to the trial's mean value).
 '''
 
 condition_vector = ['LL', 'RR', 'BB', 'RL', 'LR']
-total_number_subjects = 5
+#total_number_subjects = 5
+total_number_subjects = 6
 
 # Creo el DataFrame vacío (sé de antemano cantidad de condiciones y sujetos)
-alldata = pd.DataFrame([],
-                       columns=condition_vector,
-                       index=['sujeto %i'
-                              % i for i in range(1, total_number_subjects+1)])
+alldata = pd.DataFrame([], columns=condition_vector, index=['sujeto %i' % i for i in range(1, total_number_subjects+1)])
 
 for subject_number in range(1, total_number_subjects+1):
+    print(subject_number)    
+#for subject_number in range(1, total_number_subjects):
     for condition in condition_vector:
         # Find the block in which this subject worked in this condition
         block = Find_block(subject_number, condition)
@@ -304,14 +326,10 @@ for subject_number in range(1, total_number_subjects+1):
                        if trials[0][indice] == 1]
 
         # Build a matrix with all valid trials without transitory part
-        trials_matrix = trials_matrix_fun(subject_number, block, condition,
-                                          valid_index)
+        trials_matrix = trials_matrix_fun(subject_number, block, condition, valid_index)
         # Make it into a DataFrame
-        trialsdf = pd.DataFrame(trials_matrix,
-                                columns=['beep%i'
-                                         % i for i in range(40)],
-                                index=['trial%i'
-                                       % i for i in range(len(trials_matrix))])
+        #trialsdf = pd.DataFrame(trials_matrix, columns=['beep%i' % i for i in range(40)], index=['trial%i' % i for i in range(len(trials_matrix))])
+        trialsdf = pd.DataFrame(trials_matrix, columns=['beep%i' % i for i in range(4)], index=['trial%i' % i for i in range(len(trials_matrix))])
 
         # Locate the new DataFrame in the main DF where it belongs
         alldata[condition]['sujeto %i' % subject_number] = trialsdf
@@ -346,10 +364,10 @@ max_dif_accept = 20
 
 for condition in condition_vector:
     for subj_number in all_subjects:
-        x_firsthalf = alldata[condition]['sujeto %i'
-                                         % subj_number].mean()[0:15].mean()
-        x_secondhalf = alldata[condition]['sujeto %i'
-                                          % subj_number].mean()[15:40].mean()
+        #x_firsthalf = alldata[condition]['sujeto %i' % subj_number].mean()[0:15].mean()
+        x_firsthalf = alldata[condition]['sujeto %i' % subj_number].mean()[0:2].mean()
+        #x_secondhalf = alldata[condition]['sujeto %i' % subj_number].mean()[15:40].mean()
+        x_secondhalf = alldata[condition]['sujeto %i' % subj_number].mean()[2:4].mean()
 
         if abs(x_firsthalf-x_secondhalf) > max_dif_accept:
             print('El sujeto S00%i tiene drift en la condicion %s'

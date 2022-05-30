@@ -5,41 +5,45 @@
 //Manda estímulo al pin 11 y al pin 12 (timer 1)
 //y feedback al pin 5 y al pin 2 (timer 3)
 
-#define stimPinR 12
-#define stimPinL 11
-#define fdbkPinR 2
-#define fdbkPinL 5
-#define noisePinR 9
-#define noisePinL 9
-#define pinVG A11
+#define stimPinR 12   //ESTÍMULO EN PIN 12 ENVIADO POR EL TIMER 1 (En función initTimers).
+#define stimPinL 11   //ESTÍMULO EN PIN 11 ENVIADO POR EL TIMER 1 (En función initTimers).
+#define fdbkPinR 2    //FEEDBACK EN PIN 2 ENVIADO POR EL TIMER 3 (En función initTimers).
+#define fdbkPinL 5    //FEEDBACK EN PIN 2 ENVIADO POR EL TIMER 3 (En función initTimers).
+#define noisePinR 9   //RUIDO BLANCO (Comparte pin con noisePinL)
+#define noisePinL 9   //RUIDO BLANCO (Comparte pin con noisePinR)
+#define pinVG A11     //VALOR DE 0V VIRTUAL GENERADO POR EL SHIELD PARA LA SENOIDAL. 
 
-#define LFSR_INIT  0xfeedfaceUL
-#define LFSR_MASK  ((unsigned long)( 1UL<<31 | 1UL <<15 | 1UL <<2 | 1UL <<1  ))
+#define LFSR_INIT  0xfeedfaceUL   //ES UN VALOR TOMADO DE INTERNET PARA LA RUTINA DE RUIDO BLANCO.
+#define LFSR_MASK  ((unsigned long)( 1UL<<31 | 1UL <<15 | 1UL <<2 | 1UL <<1  ))   //SE UTILIZA TAMBIÉN PARA LA RUTINA DE RUIDO BLANCO.
 
 //http://sphinx.mythic-beasts.com/~markt/ATmega-timers.html
-boolean stimRight=true;  //pin12 - timer 1, channel B: right
-boolean stimLeft=true;  //pin11 - timer 1, channel A: left
-boolean fdbkRight=true; //pin2 - timer 3, channel B: right
-boolean fdbkLeft=true;  //pin5 - timer 3, channel A: left
-boolean noise = false;
+boolean stimRight=true;  //pin12 - timer 1, channel B: right. TRUE: CARGA UN VALOR DE LA TABLA DEL SENO EN EL REGISTRO DE COMPARACIÓN DEL TIMER1 OCR1B
+boolean stimLeft=true;  //pin11 - timer 1, channel A: left.   TRUE: CARGA UN VALOR DE LA TABLA DEL SENO EN EL REGISTRO DE COMPARACIÓN DEL TIMER1 OCR1A
+boolean fdbkRight=true; //pin2 - timer 3, channel B: right.   TRUE: CARGA UN VALOR DE LA TABLA DEL SENO EN EL REGISTRO DE COMPARACIÓN DEL TIMER1 OCR3B
+boolean fdbkLeft=true;  //pin5 - timer 3, channel A: left.    TRUE: CARGA UN VALOR DE LA TABLA DEL SENO EN EL REGISTRO DE COMPARACIÓN DEL TIMER1 OCR3A
+boolean noise = false;                                      //SE UTILIZA EN LA INTERRUP DEL TIMER 2 PARA LA GENERACIÓN DEL RUIDO BLANCO
 
 unsigned long int t=0;
-long int prevStim_t=0,prevFdbk_t=0;
-boolean stim_flag=false;
-boolean fdbk_flag=false;
+long int prevStim_t=0;  //UTILIZADO EN LOOP() PARA EL CÁLCULO DE TIEMPO PARA EL ENVÍO DEL ESTÍMULO.
+long int prevFdbk_t=0;  //UTILIZADO EN LA FUNCIÓN GET_PARAMETERS() EN EL CÁLCULO DE TIEMPO PARA LA RECEPCIÓN DE RESPUESTA POR PULSADOR
+boolean stim_flag=false;//TRUE: LA VARIABLE AUX1 TOMA EL VALOR DE LA TABLA DE LA SENOIDAL
+boolean stim_flag2=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
+boolean stim_flag3=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
+boolean fdbk_flag=false;//TRUE: LA VARIABLE AUX3 TOMA EL VALOR DE LA TABLA DE LA SENOIDAL
 
 unsigned int stimFreq = 440;//(C6) // defines the frequency (i.e., pitch) of the tone (in Hz)
 unsigned int fdbkFreq = 660;//(C6) // defines the frequency (i.e., pitch) of the tone (in Hz)
 
-int vg = 0;
-int read_vg = 0;
-int amplitude = 1;
+int vg = 0; //VALOR EN ENTERO DE LA MEDICIÓN DEL 0V VIRTUAL ENTREGADO POR EL SHIELD, ESCALADO A 10BIT (1024)
+int read_vg = 0;  //TOMA SU VALOR DE LA FUNCIÓN READVIRTUALGROUND()
+int amplitude = 1;  //SE USA EN VARIOS LADOS. TODAVÍA NO SÉ PARA QUE ES?????????????????????
 
-uint16_t phaseIncrementStim = 0;  // 16 bit delta
+uint16_t phaseIncrementStim = 0;  // 16 bit delta     //ESTOS CUATRO SE USAN PARA MODIFICAR EL INDEX DEL ARREGLO DE LA SEÑAL SENOIDAL, PERO NO ENTIENDO COMO FUNCIONA. HACE UN CORRIMIENTO????
 uint16_t phaseIncrementFdbk = 0; // 16 bit delta
 uint16_t phaseAccumulatorStim = 0;  // 16 bit accumulator
 uint16_t phaseAccumulatorFdbk = 0; // 16 bit accumulator
-int stim_counter, fdbk_counter;
+int stim_counter; //VA AUMENTANDO EN LA INTERRUPCIÓN DEL TIMER1 Y SE COMPARA CON STIM_DURATION_CYCLES (DURACIÓN DEL ESTÍMULO). CUANDO TERMINA EL CICLO SE RESETEA.
+int fdbk_counter; //VA AUMENTANDO EN LA INTERRUPCIÓN DEL TIMER3 Y SE COMPARA CON FDBK_DURATION_CYCLES (DURACIÓN DEL ESTÍMULO). CUANDO TERMINA EL CICLO SE RESETEA.
 
 // DDS resolution
 const uint32_t freq_samp = 31180; // 16MHz/513 porque ahora el pin está en modo 9 bits
@@ -47,30 +51,34 @@ const uint16_t resolution_DDS = pow(2,16)/freq_samp;
 
 
 //AGREGO
-uint16_t FDBK_DURATION_CYCLES = 23; // feedback duration (cycles)
-uint16_t STIM_DURATION_CYCLES = 23; // stimulus duration (cycles)
-#define STIM_DURATION 50 //stimulus duration (milliseconds)
-#define FDBK_DURATION 50 //este lo agrego yo 
+uint16_t FDBK_DURATION_CYCLES = 23; // feedback duration (cycles).  //CICLOS DE DURACIÓN DEL CICLO
+uint16_t STIM_DURATION_CYCLES = 23; // stimulus duration (cycles)   //CICLOS DE DURACIÓN DEL ESTÍMULO
+#define STIM_DURATION 50 //stimulus duration (milliseconds)         //NO ES UTILIZADO
+#define FDBK_DURATION 50 //este lo agrego yo                        //NO ES UTILIZADO
 #define ANTIBOUNCE (0.5*isi)//minimum interval between responses (milliseconds)
-boolean allow;
-int fdbk, i;
-unsigned int stim_number,fdbk_number;
-unsigned int *event_number;
-char *event_name;
-unsigned long *event_time;
-unsigned int event_counter; 
+boolean allow;  //CUANDO ALLOW ES FALSE, SE REGISTRA EL EVENTO DEL TRIAL
+int fdbk;       //REGISTRA EL VALOR DE ENTRADA DEL PIN QUE LEE LA RESPUESTA DEL SUJETO DE ESTUDIO
+int i;
+unsigned int stim_number;     //REGISTRA EL NÚMERO DE ESTÍMULO
+unsigned int fdbk_number;     //REGISTRA EL NÚMERO DE FEEDBACK
+unsigned int *event_number;   //ENTIENDO QUE ES UN PUNTERO PARA RECORRER UN ARREGLO CON EL NÚMERO DE EVENTO
+char *event_name;             //ENTIENDO QUE ES UN PUNTERO PARA RECORRER UN ARREGLO CON EL NOMBRE DEL EVENTO.
+unsigned long *event_time;    //ENTIENDO QUE ES UN PUNTERO PARA RECORRER UN ARREGLO CON LOS TIEMPOS DE CADA EVENTO.
+unsigned int event_counter;   //ENTIENDO QUE ES UN ÍNDICE QUE SE UTILIZA PARA RECORRER LOS ESPACIOS DE MEMORIA INDICADOS POR LOS TRES PUNTEROS ANTERIORES.
 
-unsigned int isi=500,n_stim=3; //Entiendo que son valores iniciales por las dudas 
-int perturb_size=0;  // estos los agrego paraque no tire error
-unsigned int perturb_bip=0;
-unsigned int event_type=0;
-#define INPUTPIN A9
-char message[20];
-boolean SR=false, SL=false, FR=false, FL=false, NR=false, NL=false;
+unsigned int isi=500;   //INICIALIZACIÓN DEL PERÍODO DEL ESTÍMULO, EL VALOR UTILIZADO SE RECIBE POR PYTHON.
+unsigned int prevIsi=0; //AUXILIAR PARA GUARDAR PERÍODO, EN EXPERIMENTO DE PERTURBACIÓN CON PHASE SHIFT.
+unsigned int n_stim=3;  //Entiendo que son valores iniciales por las dudas //NO ENTIENDO BIEN PARA QUE SE USA ESTA VARIABLE, PARECIERA QUE PARA INDICAR CUÁL VA A SER EL NÚMERO TOTAL DE ESTÍMULOS
+int perturb_size=0;     //TIEMPO DE PERTURBACIÓN QUE MODIFICA AL ISI(PERÍODO). ES UN INT, PORQUE EL DATO VIENE DE PYTHON Y PUEDE TENER SIGNO. 
+unsigned int perturb_bip=0;   //SE ENVÍA VALOR DESDE PYTHON PARA INDICAR EN QUE BEEP SE VA A REALIZAR UNA PERTURBACIÓN EN EL ESTÍMULO.
+unsigned int perturb_type=0;  //SELECCIONA EL TIPO DE PERTURBACIÓN 0->I(NO REALIZA PERTURBACIÓN), 1->S(STEP SHIFT), 2->(PHASE SHIFT).
+#define INPUTPIN A9   //DEFINICIÓN DEL PIN DE ENTRADA DE RESPUESTA DEL USUARIO.
+char message[20];     //NO ENTIENDO SI SE ESTÁ USANDO, NO LO VEO PUESTO EN PROGRAMA EN FORMATO ARREGLO.  
+boolean SR=false, SL=false, FR=false, FL=false, NR=false, NL=false; //ESTÁN DENTRO DE UN SWITCH CASE, TODAVÍA NO ENTIENDO PARA QUE SE USAN.
 
 //////////// Set up lookup table for waveform generation
 // sine wavefunction
-static const uint8_t  sineTable[] PROGMEM = {
+static const uint8_t  sineTable[] PROGMEM = {   //UTILIZA PROGMEM PARA QUE LA TABLA SE GUARDE EN LA MEMORIA FLASH EN VEZ DE EN LA SRAM (ESTA ÚLTIMA ES VOLÁTIL)
 0x80,0x83,0x86,0x89,0x8c,0x8f,0x92,0x95,
 0x98,0x9c,0x9f,0xa2,0xa5,0xa8,0xab,0xae,
 0xb0,0xb3,0xb6,0xb9,0xbc,0xbf,0xc1,0xc4,
@@ -106,71 +114,71 @@ static const uint8_t  sineTable[] PROGMEM = {
 };
 
 ISR(TIMER1_OVF_vect) {
-  // wavetable lookup index (upper 8 bits of the accumulator)
-  uint8_t index1 = 0;
-  uint16_t aux1;
+  // wavetable lookup index (upper 8 bits of the accumulator)   //indice de búsqueda de tabla de ondas (8 bits superiores del acumulador)
+  uint8_t index1 = 0;   //ÍNDICE PARA EL RECORRIDO DE LA TABLA DEL SENO EN LA MEMORIA FLASH
+  uint16_t aux1;        //AUXILIAR PARA GUARDAR EL VALOR PWM DE LA TABLA SENO QUE SE RECUPERA DE LA MEMORIA FLASH
   
   // Update accumulator
   phaseAccumulatorStim += phaseIncrementStim;
-  index1 = phaseAccumulatorStim >> 8;
+  index1 = phaseAccumulatorStim >> 8;                     //GUARDA EN INDEX1 EL EL BYTE MÁS SIGNIFICATIVO DE phaseAccumulatorStim.
   if(index1 <= (phaseIncrementStim >>8))  stim_counter++; // counter aumenta cuando index1 resetea
 
-  OCR1A = vg;
-  OCR1B = vg;
+  OCR1A = vg;   //CARGAN EN EL REGISTRO OCR1A EL VALOR EN ENTERO DE LA MEDICIÓN DEL 0V VIRTUAL ENTREGADO POR EL SHIELD, ESCALADO A 10BIT (1024)?? ES PARA DETECTAR EL CRUCE POR CERO?? LA CANTIDAD DE BITS DE LOS REGISTROS NO COINCIDEN.
+  OCR1B = vg;   //CARGAN EN EL REGISTRO OCR1B EL VALOR EN ENTERO DE LA MEDICIÓN DEL 0V VIRTUAL ENTREGADO POR EL SHIELD, ESCALADO A 10BIT (1024)?? ES PARA DETECTAR EL CRUCE POR CERO?? LA CANTIDAD DE BITS DE LOS REGISTROS NO COINCIDEN.
 
-  
+    
 // if (t-prevStim_t<STIM_DURATION){
-  if (stim_counter< STIM_DURATION_CYCLES){
+  if (stim_counter< STIM_DURATION_CYCLES){ // VERIFICA SI stim_counter ES MENOR A LA DURACIÓN DEL ESTÍMULO.
   
-   if(stim_flag==true){
-    aux1 = pgm_read_byte(&sineTable[index1]);
+   if(stim_flag==true){                             //HABILITA QUE LA VARIABLE AUX1 TOME EL VALOR DE LA TABLA DE LA SENOIDAL
+    aux1 = pgm_read_byte(&sineTable[index1]);       //ESTA FUNCIÓN SE UTILIZA PARA LEER UN BYTE UBICADO EN LA MEMORIA FLASH (EN ESTE CASO LE PASA LA DIRECCIÓN DE MEMORIA ADONDE ESTÁ APUNTANDO EL ÍNDICE)
   // Read oscillator value for next interrupt
     
-    if (stimLeft==true)  OCR1A = aux1;
+    if (stimLeft==true)  OCR1A = aux1;    //CARGA EL VALOR ACTUAL DEL PWM PARA LA CONSTRUCCIÓN DE LA SENOIDAL EN EL REGISTRO DE COMPARACIÓN OCR1A
 
-    if (stimRight==true)   OCR1B = aux1;
+    if (stimRight==true)   OCR1B = aux1;  //CARGA EL VALOR ACTUAL DEL PWM PARA LA CONSTRUCCIÓN DE LA SENOIDAL EN EL REGISTRO DE COMPARACIÓN OCR1B
   
   }  
  }
 
-else  stim_flag=false;
+else  stim_flag=false;    //SI stim_counter ES >= A LA DURACIÓN DEL ESTÍMULO, stim_flag = FALSE Y YA NO SE MODIFICAN LOS REGISTROS OCR1A Y OCR1B
 
 }
 
 
 ISR(TIMER3_OVF_vect) {
   // wavetable lookup index (upper 8 bits of the accumulator)
-  uint8_t index3 = 0;
-  uint16_t aux3;
+  uint8_t index3 = 0;   //ÍNDICE PARA EL RECORRIDO DE LA TABLA DEL SENO EN LA MEMORIA FLASH
+  uint16_t aux3;        //AUXILIAR PARA GUARDAR EL VALOR PWM DE LA TABLA SENO QUE SE RECUPERA DE LA MEMORIA FLASH
   
   // Update accumulator
   phaseAccumulatorFdbk += phaseIncrementFdbk;
-  index3 = phaseAccumulatorFdbk >> 8;
-  if(index3 <= (phaseIncrementFdbk >>8))  fdbk_counter++; // counter aumenta cuando index1 resetea
+  index3 = phaseAccumulatorFdbk >> 8;                     //GUARDA EN INDEX3 EL EL BYTE MÁS SIGNIFICATIVO DE phaseAccumulatorFdbk.
+  if(index3 <= (phaseIncrementFdbk >>8))  fdbk_counter++; // counter aumenta cuando index3 resetea
 
-  OCR3A = vg;
-  OCR3B = vg;
+  OCR3A = vg; //CARGAN EN EL REGISTRO OCR3A EL VALOR EN ENTERO DE LA MEDICIÓN DEL 0V VIRTUAL ENTREGADO POR EL SHIELD, ESCALADO A 10BIT (1024)?? ES PARA DETECTAR EL CRUCE POR CERO?? LA CANTIDAD DE BITS DE LOS REGISTROS NO COINCIDEN.
+  OCR3B = vg; //CARGAN EN EL REGISTRO OCR3B EL VALOR EN ENTERO DE LA MEDICIÓN DEL 0V VIRTUAL ENTREGADO POR EL SHIELD, ESCALADO A 10BIT (1024)?? ES PARA DETECTAR EL CRUCE POR CERO?? LA CANTIDAD DE BITS DE LOS REGISTROS NO COINCIDEN.
 
 //  if (t-prevFdbk_t<FDBK_DURATION){
-  if (fdbk_counter< FDBK_DURATION_CYCLES){
+  if (fdbk_counter< FDBK_DURATION_CYCLES){        // VERIFICA SI fdbk_counter ES MENOR A LA DURACIÓN DEL ESTÍMULO.
     
-    if(fdbk_flag==true){
-      aux3 = pgm_read_byte(&sineTable[index3]);
+    if(fdbk_flag==true){                          //HABILITA QUE LA VARIABLE AUX3 TOME EL VALOR DE LA TABLA DE LA SENOIDAL
+      aux3 = pgm_read_byte(&sineTable[index3]);   //ESTA FUNCIÓN SE UTILIZA PARA LEER UN BYTE UBICADO EN LA MEMORIA FLASH (EN ESTE CASO LE PASA LA DIRECCIÓN DE MEMORIA ADONDE ESTÁ APUNTANDO EL ÍNDICE)
     // Read oscillator value for next interrupt
    
-      if (fdbkLeft==true)  OCR3A = aux3;
+      if (fdbkLeft==true)  OCR3A = aux3;          //CARGA EL VALOR ACTUAL DEL PWM PARA LA CONSTRUCCIÓN DE LA SENOIDAL EN EL REGISTRO DE COMPARACIÓN OCR3A
   
-      if (fdbkRight==true)   OCR3B = aux3;
+      if (fdbkRight==true)   OCR3B = aux3;        //CARGA EL VALOR ACTUAL DEL PWM PARA LA CONSTRUCCIÓN DE LA SENOIDAL EN EL REGISTRO DE COMPARACIÓN OCR3B
     
     }  
    }
   
-  else  fdbk_flag=false;
+  else  fdbk_flag=false;                          //SI fdbk_counter ES >= A LA DURACIÓN DEL ESTÍMULO,fdbk_flag = FALSE Y YA NO SE MODIFICAN LOS REGISTROS OCR3A Y OCR3B
   
 }
 
 
-ISR(TIMER2_OVF_vect){
+ISR(TIMER2_OVF_vect){   //TIMER PARA RUTINA DE RUIDO BLANCO
   OCR2A = 127;
   if(noise==true)
     OCR2B = generateNoise(amplitude, vg);
@@ -178,14 +186,14 @@ ISR(TIMER2_OVF_vect){
     OCR2B = vg;    
   }
 
-void initTimers(void){
+void initTimers(void){                                //FUNCIÓN PARA INICIALIZAR TIMERS
   // Stimulus
   // Set pins as output
-  pinMode(stimPinR,OUTPUT);
-  pinMode(stimPinL,OUTPUT);
+  pinMode(stimPinR,OUTPUT);                           //CONFIGURACIÓN DEL PIN 12 COMO SALIDA DEL ESTÍMULO AL LADO DERECHO
+  pinMode(stimPinL,OUTPUT);                           //CONFIGURACIÓN DEL PIN 11 COMO SALIDA DEL ESTÍMULO AL LADO DERECHO
 
   // 9-bit Fast PWM - non inverted PWM
-  TCCR1A= _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);
+  TCCR1A= _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);     
 
   // Start timer without prescaler
   TCCR1B = _BV(WGM12) | _BV(CS10);
@@ -310,10 +318,10 @@ void serial_print_string(char *string) {
 
 //---------------------------------------------------------------------
 //parse data from serial input
-//input data format: eg "I500;N30;P-10;B15;E5;X"
-void parse_data(char *line) {
-  char field[10];
-  int n,data;
+//input data format: eg "I500;n30;P-10;B15;T0;SR;FL;NB;A3;X"    //I500(Período del estímulo - isi = 500); N30(Número de estímulos - n_stim = 30); P-10(Tamaño de perturbación - perturb_size = -10);
+void parse_data(char *line) {                                   //B15(Bip de perturbación (15-20) - perturb_bip = 15); T0(Tipo de perturbación - perturb_type = 0); SR(Estímulo por oído derecho - SR)
+  char field[10];                                               //FL(Feedback por oído izquierdo - FL); NB(Ruido blanco por ambos oídos - NB); A3(Amplitud - amplitude = 3); 
+  int n,data;                                                   //Desde Python: IOk, nOk, P(No usado), B(No usado), T(No usado), SOk, FOk, NOk, AOk. 
   //scan input until next ';' (field separator)
   while (sscanf(line,"%[^;]%n",field,&n) == 1) {
     data = atoi(field+1);
@@ -331,9 +339,11 @@ void parse_data(char *line) {
       case 'B':
         perturb_bip = data;
         break;
-      case 'E':
-        event_type = data;
-        break;
+        
+      case 'T':                     //SE CAMBIO E POR T. ADS 05/22
+        perturb_type = data;
+        break;         
+        
       case 'S':
         switch (field[1]){
           case 'R':
@@ -390,7 +400,7 @@ void parse_data(char *line) {
        case 'A':
         amplitude = data;
         break; 
-        
+
       default:
         break;
     }
@@ -410,7 +420,7 @@ void get_parameters() {
   char line[45];
   char i,aux='0';
   i = 0;
-
+  
   //directly read next available character from buffer
   //if flow ever gets here, then next available character should be 'I'
   aux = Serial.read();
@@ -426,10 +436,10 @@ void get_parameters() {
           fdbk_flag=true;
         }
       } 
-   }
+  }
   //read buffer until getting an X (end of message)
   while (aux != 'X') {
-    //keep reading if input buffer is empty
+  //keep reading if input buffer is empty
     while (Serial.available() < 1) {}
     line[i] = aux;
     i++;
@@ -486,45 +496,58 @@ void setup() {
 
 void loop() {
 
-  if(allow == false){
+  if(allow == false){   //ALLOW = FALSE, PERMITE QUE SE LEA UN MENSAJE DESDE PYTHON
       
     //just in case, clear incoming buffer once read
     Serial.flush();
         
-    get_parameters();
-    allow = true;
+    get_parameters();   //LEE MENSAJE DE PYTHON DESDE EL SERIAL HASTA QUE ENCUENTRA UNA "X". EL ALGORITMO INTERPRETA LA "X" COMO FIN DE MENSAJE DESDE PYTHON. 
+    prevIsi = isi;      //GUARDA EN VARIABLE AUXILIAR prevIsi EL PERÍODO ORIGINAL isi 
+    allow = true;       //PONE EL FLAG ALLOW EN TRUE, PARA QUE NO SE LEA UN NUEVO DATO HASTA QUE NO SE PROCESE EL ACTUAL.
 
-    stim_number = 1;
-    fdbk_number = 1;
-    event_counter = 0;
+    stim_number = 1;    //INICIALIZA VARIABLE
+    fdbk_number = 1;    //INICIALIZA VARIABLE
+    event_counter = 0;  //INICIALIZA VARIABLE
     
-    event_name = (char*) calloc(3*n_stim,sizeof(char));
-    event_number = (unsigned int*) calloc(3*n_stim,sizeof(unsigned int));
-    event_time = (unsigned long*) calloc(3*n_stim,sizeof(unsigned long));
+    event_name = (char*) calloc(3*n_stim,sizeof(char));                     //RESERVA UNA MEMORIA PARA 3*n_stim ELEMENTOS DE TAMAÑO sizeof(char)(CHAR = 1 BYTE). INICIALIZA EL BLOQUE DE MEMORIA EN 0. DEVUELVE UN PUNTERO AL PRIMER CHAR EN event_name. 
+    event_number = (unsigned int*) calloc(3*n_stim,sizeof(unsigned int));   //RESERVA UNA MEMORIA PARA 3*n_stim ELEMENTOS DE TAMAÑO sizeof(unsigned int)(unsigned int = 4 BYTEs). INICIALIZA EL BLOQUE DE MEMORIA EN 0. DEVUELVE UN PUNTERO AL PRIMER UNSIGNED INT EN event_number.
+    event_time = (unsigned long*) calloc(3*n_stim,sizeof(unsigned long));   //RESERVA UNA MEMORIA PARA 3*n_stim ELEMENTOS DE TAMAÑO sizeof(unsigned long)(unsigned long = 4 BYTEs). INICIALIZA EL BLOQUE DE MEMORIA EN 0. DEVUELVE UN PUNTERO AL PRIMER UNSIGNED LONG EN event_time.
   }
 
-  else{
-    t = millis();
+  else{               //ALLOW = TRUE, CORRE EL TRIAL ENVIADO EN EL MENSAJE DE PYTHON
+    t = millis();     //REGISTRA EN t EL TIEMPO ACTUAL
 
     //turn on noise
-    SoundSwitch('n',amplitude,NL,NR);
-    
-    //send stimulus
-    if ((t-prevStim_t)> isi && stim_flag==false) { //enciende el sonido
-      SoundSwitch('s', stimFreq, SL, SR);
-      prevStim_t=t;
-      stim_flag=true;
-      save_data('S', stim_number, t);
-    }
+    SoundSwitch('n',amplitude,NL,NR);     //ENVÍA SONIDO BLANCO A AMBOS OÍDOS
 
-    //read response
-    if ((t - prevFdbk_t) > ANTIBOUNCE && fdbk_flag==false) {
-      fdbk = digitalRead(INPUTPIN);
-      if (fdbk == HIGH){
-        SoundSwitch('f', fdbkFreq, FL, FR);
-        prevFdbk_t=t;
-        fdbk_flag=true;
-        save_data('R', fdbk_number, t);
+    //send stimulus                                                     //ESTE BLOQUE IF, ES PARA ENVIAR EL ESTÍMULO AL SUJETO 
+    if ((perturb_type == 1 or perturb_type == 2) and stim_number == perturb_bip and stim_flag2 == false){
+      isi += perturb_size;
+      stim_flag2 = true;
+    }
+    if (perturb_type == 2 and stim_number == (perturb_bip + 1) and stim_flag3 == false){
+      isi = prevIsi;
+      stim_flag3 = true;
+    }
+    if ((stim_number < perturb_bip) or (stim_number > (perturb_bip + 1))){
+      stim_flag2 = false;
+      stim_flag3 = false;
+    }
+    if ((t-prevStim_t)> isi && stim_flag==false) { //enciende el sonido //SI PASÓ UN LAPSO DE TIEMPO MAYOR AL PERÍODO ENTRE ESTÍMULOS Y stim_flag == false
+      SoundSwitch('s', stimFreq, SL, SR);                               //ENVÍA ESTÍMULO
+      prevStim_t=t;                                                     //REGISTRA EL TIEMPO ACTUAL EN prevStim, PARA VOLVER A CONTAR EL PERÍODO ENTRE ESTÍMULOS
+      stim_flag=true;                                                   //DESHABILITA LA POSIBILIIDAD DE ENVIAR UN NUEVO ESTÍMULO
+      save_data('S', stim_number, t);                                   //GUARDA EL NÚMERO DE ESTÍMULO Y EL TIEMPO AL CUÁL OCURRIÓ.
+    }
+    
+    //read response                                             //ESTE BLOQUE IF, ES PARA ENVIAR LA RESPUESTA AL SUJETO
+    if ((t - prevFdbk_t) > ANTIBOUNCE && fdbk_flag==false) {    //SE APLICA UN FILTRO ANTIREBOTE, PARA EVITAR QUE SE REGISTRE MÁS DE UNA RESPUESTA
+      fdbk = digitalRead(INPUTPIN);                             //SE LEE LA RESPUESTA DEL SUJETO DESDE EL PIN DEL ARDUINO
+      if (fdbk == HIGH){                                        //EVALÚA SI EL PIN ESTÁ EN 1
+        SoundSwitch('f', fdbkFreq, FL, FR);                     //ENVÍA SONIDO DE FEEDBACK AL SUJETO
+        prevFdbk_t=t;                                           //REGISTRA EL TIEMPO ACTUAL EN prevFdbk,PARA UTILIZARLO EN EL FILTRO ANTIREBOTE ((t - prevFdbk_t) > ANTIBOUNCE)
+        fdbk_flag=true;                                         //DESHABILITA LA POSIBILIIDAD DE REGISTRAR UNA NUEVA RESPUESTA
+        save_data('R', fdbk_number, t);                         //GUARDA EL NÚMERO DE FEEDBACK Y EL TIEMPO AL CUÁL OCURRIÓ.
       }
     }
 
