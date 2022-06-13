@@ -7,12 +7,16 @@ Created on Thu Oct 17 11:04:30 2019
 
 import serial, time
 import numpy as np
+import numpy.matlib as mlib
 import matplotlib.pyplot as plt
 import random
 import os
 from itertools import permutations 
 import glob
 import pickle
+import pandas as pd
+import csv
+
 
 #%% Description
 
@@ -26,66 +30,110 @@ import pickle
 
 arduino = serial.Serial('COM4', 9600)
 
+
+#%% Definitions
+
+# Define variables
+
+ISI = 500		             # Interstimulus interval (milliseconds)
+n_stim = 35	                 # Number of bips within a sequence
+n_trials_perblock = 20       # Number of trials per conditions
+n_blocks = 3                 # Number of blocks
+n_subj_max = 100             # Maximum number of subjects
+perturb_type = 2             # Perturbation type
+perturb_size = 100           # Perturbation size
+
+
 #%% Conditions
 
-# filename for file that will contain all possible conditions permutations
-filename_orders = './Data/Posibles_permutaciones_condiciones_probando.dat'
+# Filename for the file that will contain all possible permutations for the subjects
+presentation_orders = './Data/Presentation_orders.csv'
 
-# all possible conditions for stimulus and feedback
-all_conditions = [['L','L'], ['L','R'], ['L','N'], ['R','L'], ['R','R'], ['R','N'], ['B','L'], ['B','R'], ['B','N'],['B','B']];
+# Number of trials
+n_trials = n_trials_perblock * n_blocks
 
-# condition dictionary so we can choose the condition without going through number position
-condition_dictionary = {"LL": 0,"LR": 1,"LN": 2,"RL": 3,"RR": 4,"RN": 5,"BL": 6,"BR": 7,"BN": 8,"BB": 9};
+# All possible conditions for perturbations
+all_conditions = ['pos', 'neg', 'iso']
+n_conditions = len(all_conditions)      # number of conditions
 
-binary_response = input("Es la primera vez que corres este experimento/piloto? [y/n] ") 
+# Condition dictionary so we can choose the condition without going through number position
+condition_dictionary = {"pos": 0,"neg": 1,"iso": 2}
 
-# if this is the first time running the experiment, then it's necessary to generate the file with all possible permutations
-if binary_response == 'y':
+# Start experiment or generate Perturbation_orders.csv file
+start_or_generate_response = input("Presione enter para iniciar experimento, o escriba la letra G (generar archivo con órdenes de presentación) y presione enter: ") 
+
+# If this is the first time running the experiment, then it's necessary to generate the Presentation_orders.csv file
+if start_or_generate_response == 'G':
+    
+    confirm_response = input('¿Está seguro? Si el archivo ya existe se sobrescribirá. Escriba S y presione enter para aceptar, o sólo presione enter para cancelar: ')
+    
+    if confirm_response == 'S':
+        chosen_conditions = mlib.repmat(np.arange(0,n_conditions),n_subj_max,n_trials_perblock)
+        for i in range(0,n_subj_max):
+            random.shuffle(chosen_conditions[i])
+       
+        presentation_orders_df = pd.DataFrame()
+                      
+        for i in range(0,n_subj_max):
+            next_subject_number = '{0:0>3}'.format(i)
+            next_subject_number = 'S' + next_subject_number
+            presentation_orders_df[next_subject_number] = chosen_conditions[i]
+        
+        presentation_orders_df.index.name="Trial"
+  
+        presentation_orders_df.to_csv(presentation_orders)
+        
+    
+#%%      
+    
     
     # vector that will contain all conditions needed for this experiment    
-    inputs = []
-    inp = input("Elija las condiciones que quiere usar separandolas por Enters. Al finalizar vuelva a presionar Enter.\n")
-    while inp != "":
-        inputs.append(inp)  
-        inp = input()
-        if inp == "":
-            break
+    #inputs = []
+    #inp = input("Elija las condiciones que quiere usar separandolas por Enters. Al finalizar vuelva a presionar Enter.\n")
+    #while inp != "":
+    #    inputs.append(inp)  
+    #    inp = input()
+    #    if inp == "":
+    #        break
         
     # finding the conditions index in the dictionary
-    conditions_chosen_index = []    
-    for condition in inputs:
-        conditions_chosen_index.append(condition_dictionary[condition])
+    #chosen_conditions = []    
+    #for condition in inputs:
+    #    chosen_conditions.append(condition_dictionary[condition])
         
     # find all possible permutations of these conditions    
-    all_possible_orders_conditions = list(permutations(conditions_chosen_index))
+    #all_possible_orders_conditions = list(permutations(chosen_conditions))
     # save them in a file
-    with open(filename_orders, 'wb') as fp:
-        pickle.dump(all_possible_orders_conditions, fp)
+    #with open(presentation_orders, 'wb') as fp:
+    #    pickle.dump(all_possible_orders_conditions, fp)
 
 # if this isn't the first time running the experiment, the file with all possible permutations should already exist and have the information of the permutations already used by subjects (those permutations will no longer be in the file)
-else:
+#else:
     # try to find the file. If it doesn't exist in the directory, raise an error.
-    try:
-        f_orders = open(filename_orders,"r")
-        pass
+#    try:
+#        f_orders = open(presentation_orders,"r")
+#        pass
         
-    except IOError:
-        print('El archivo con las permutaciones de las condiciones no esta donde deberia, ubicalo en la carpeta correcta y volve a correr esta celda')
-        raise
+#    except IOError:
+#        print('El archivo con las permutaciones de las condiciones no esta donde deberia, ubicalo en la carpeta correcta y volve a correr esta celda')
+#        raise
     
 #%% Definitions
 
 # Define variables
 
-ISI = 500;		# interstimulus interval (milliseconds)
-n_stim =30;	# number of bips within a sequence
+#ISI = 500;		# interstimulus interval (milliseconds)
+#n_stim =30;	# number of bips within a sequence
 
-with open (filename_orders, 'rb') as fp:
-    content = pickle.load(fp)
+#with open (presentation_orders, 'rb') as fp:
+#    content = pickle.load(fp)
 # total number of blocks (equal to number of conditions since we have one condition per block)
-N_blocks = len(content[0]);
+#N_blocks = len(content[0]);
 # number of trials per condition per block
-N_trials_per_block_per_cond = 2;
+#N_trials_per_block_per_cond = 2;
+
+# Open Presentation_orders.csv file as dataframe
+presentation_orders_df = pd.read_csv(presentation_orders,index_col='Trial')
 
 # Define Python user-defined exceptions
 class Error(Exception):
@@ -94,19 +142,19 @@ class Error(Exception):
 
 #%% Experiment
 
-# check for file with names and pseudonyms
-filename_names = "C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\Dic_names_pseud.dat"
+# Check for file with names and pseudonyms
+filename_names = './Data/Dic_names_pseud.dat'
 
 try:
     f_names = open(filename_names,"r")
 
     if os.stat(filename_names).st_size == 0:
-        next_subject_number = '001';
+        curr_subject_number = '001';
         f_names.close();
     else:
         content = f_names.read();
         last_subject_number = int(content [-3:]);
-        next_subject_number = '{0:0>3}'.format(last_subject_number + 1);
+        curr_subject_number = '{0:0>3}'.format(last_subject_number + 1);
         f_names.close()
         
 except IOError:
@@ -117,92 +165,106 @@ except IOError:
 name = input("Ingrese su nombre: ") 
 
 f_names = open(filename_names,"a")
-f_names.write('\n'+name+'\tS'+next_subject_number)
+f_names.write('\n'+name+'\tS'+curr_subject_number)
 f_names.close()
 
-with open (filename_orders, 'rb') as fp:
-    content = pickle.load(fp)
-    print(fp)
+#with open (presentation_orders, 'rb') as fp:
+#    content = pickle.load(fp)
+#    print(fp)
     
-cond_order_block = random.choice(content)
+#cond_order_block = random.choice(content)
 
-content.pop(content.index(cond_order_block))
+#content.pop(content.index(cond_order_block))
 
-with open(filename_orders, 'wb') as fp:
-    pickle.dump(content, fp)
+#with open(presentation_orders, 'wb') as fp:
+#    pickle.dump(content, fp)
 
-# run blocks
-block_counter = 0;
+# Run blocks
+block_counter = 0
 
-while (block_counter < N_blocks):
+# Trials for the current subject
+subject_df = pd.DataFrame(presentation_orders_df['S' + curr_subject_number])
+
+
+while (block_counter < n_blocks):
     
-    condition_vector = [] # vector that will contain the specified condition the correct amount of times (it's important to restart it here!)
-    for i in range(N_trials_per_block_per_cond):
-        condition_vector.append(all_conditions[cond_order_block[block_counter]])
+    # Block conditions
+    block_conditions_aux = block_counter * n_trials_perblock
+    block_conditions_df = subject_df.loc[block_conditions_aux : block_conditions_aux + n_trials_perblock - 1]
+    perturb_bip_list = []
+    perturb_size_list = []
+    for i in range(0,n_trials_perblock):
+        perturb_bip_list.append(random.randrange(10,15,1))
+        trial_type = (block_conditions_df.loc[[block_conditions_aux + i]].values.tolist())[0][0]
+        if (trial_type == 0):
+            perturb_size_list.append(perturb_size)        # Perturbation size 
+        elif (trial_type == 1):
+            perturb_size_list.append(-perturb_size)       # Perturbation size 
+        else:
+            perturb_size_list.append(0)                   # Perturbation size 
+    block_conditions_df = block_conditions_df.assign(Perturb_bip = perturb_bip_list, Perturb_size = perturb_size_list, Original_trial = range(block_conditions_aux,block_conditions_aux + n_trials_perblock))
+    
+    #condition_vector = [] # vector that will contain the specified condition the correct amount of times (it's important to restart it here!)
+    #for i in range(N_trials_per_block_per_cond):
+    #    condition_vector.append(all_conditions[cond_order_block[block_counter]])
     # total number of trials per block
-    N_trials_per_block = len(condition_vector) # unlike N_trials_per_block_per_cond this variable will change if a trial goes wrong
+    #n_trials_perblock = len(condition_vector) # unlike N_trials_per_block_per_cond this variable will change if a trial goes wrong
 
-    Stim_conds = [] # vector that will contain all stimulus conditions
-    Fdbk_conds = [] # vector that will contain all feedback conditions
-    for i in range(len(condition_vector)):
-        Stim_conds.append(condition_vector[i][0])
-        Fdbk_conds.append(condition_vector[i][1])
+    #Stim_conds = [] # vector that will contain all stimulus conditions
+    #Fdbk_conds = [] # vector that will contain all feedback conditions
+    #for i in range(len(condition_vector)):
+    #    Stim_conds.append(condition_vector[i][0])
+    #    Fdbk_conds.append(condition_vector[i][1])
     
-    # run one block
-    input("Presione Enter para comenzar el bloque (%d/%d)" %  (block_counter+1,N_blocks));
+    # Run one block
+    input("Presione Enter para comenzar el bloque (%d/%d):" %  (block_counter+1,n_blocks));
     
-    # set time for file name
+    # Set time for file name
     timestr = time.strftime("%Y_%m_%d-%H.%M.%S")
     
-    # trial counter
     trial = 0
     
     conditions = [] # vector that will contain exact message sent to arduino to register the conditions played in each trial
-    valid_trial = [] # vector that will contain 1 if the trial was valid or 0 if it wasn't
+    valid_trials = [] # vector that will contain 1 if the trial was valid or 0 if it wasn't
     errors = [] # vector that will contain the type of error that ocurred if any did    
     
-    # generate filename for file that will contain all conditions used in the trial along with the valid_trials vector    
-    #filename_block = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials" 
-    filename_block = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials"
+    # Generate filename for file that will contain all conditions used in the trial along with the valid_trials vector    
+    filename_block = './Data/S'+curr_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials"
     
-    while (trial < N_trials_per_block):
-        input("Presione Enter para comenzar el trial (%d/%d)" % (trial+1,N_trials_per_block));
+    while (trial < len(block_conditions_df.index)):
+        input("Presione Enter para comenzar el trial (%d/%d):" % (trial+1,len(block_conditions_df.index)));
         plt.close(1)
         plt.close(2)
         
-        # generate raw data file 
-        filename_raw = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)+"-raw.dat"
+        # Generate raw data file 
+        filename_raw = './Data/S'+curr_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)+"-raw.dat"
         f_raw = open(filename_raw,"w+")
      
-        # generate extracted data file name (will save raw data, stimulus time, feedback time and asynchrony)
-        #filename_data = '/home/paula/Tappingduino3/tappingduino-3-master/Datos/S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)
-        filename_data = 'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+next_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)    
+        # Generate extracted data file name (will save raw data, stimulus time, feedback time and asynchrony)
+        filename_data = './Data/S'+curr_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-"+"trial"+str(trial)    
         
-        # wait random number of seconds before actually starting the trial
+        # Wait random number of seconds before actually starting the trial
         wait = random.randrange(10,20,1)/10.0
         time.sleep(wait)
         
-        # define stimulus and feedback condition for this trial
-        Stim = Stim_conds[trial];
-        Resp = Fdbk_conds[trial];
-          
-        # send message with conditions to arduino
-        perturb_size = 100
-        perturb_bip = 15
-        perturb_type = 2
-        message = str.encode(";S%c;F%c;N%c;A%d;I%d;n%d;P%d;B%d;T%d;X" % (Stim, Resp,'B', 3, ISI, n_stim, perturb_size, perturb_bip, perturb_type))   #MODIF ADS
+        # Define stimulus and feedback condition for this trial
+        #Stim = Stim_conds[trial];
+        #Resp = Fdbk_conds[trial];
+        perturb_size_aux = (block_conditions_df.loc[[trial],['Perturb_size']].values.tolist())[0][0]
+        perturb_bip_aux = (block_conditions_df.loc[[trial],['Perturb_bip']].values.tolist())[0][0]
+                  
+        # Send message with conditions to arduino
+        message = str.encode(";S%c;F%c;N%c;A%d;I%d;n%d;P%d;B%d;T%d;X" % ('B', 'B', 'B', 3, ISI, n_stim, perturb_size_aux, perturb_bip_aux, perturb_type))
         arduino.write(message)
         conditions.append(message)
         #time.sleep(25)            
 
-        # read information from arduino
+        # Read information from arduino
         data = []
-        #aux = arduino.readline()
         aux = arduino.readline().decode()
         while (aux[0]!='E'):
             data.append(aux)
             f_raw.write(aux) # save raw data
-            #aux = arduino.readline();
             aux = arduino.readline().decode()
                    
         # Separates data in type, number and time
@@ -310,7 +372,7 @@ while (block_counter < N_blocks):
                             
                              
                     # if the code got here, then the trial is valid!:
-                    valid_trial.append(1)
+                    valid_trials.append(1)
                     errors.append('NoError') 
                     
                 #==============================================================================
@@ -372,19 +434,29 @@ while (block_counter < N_blocks):
                
         except (Error):
             # trial is not valid! then:
-            valid_trial.append(0)
+            valid_trials.append(0)
                 
             # appends conditions for this trial at the end of the conditions vectors, so that it can repeat at the end
-            Stim_conds.append(Stim_conds[trial])
-            Fdbk_conds.append(Fdbk_conds[trial])
-          
-            # go to next trial
+            #Stim_conds.append(Stim_conds[trial])
+            #Fdbk_conds.append(Fdbk_conds[trial])
+                      
+            # Add 1 to number of trials per block since will have to repeat one
+            #n_trials_perblock = n_trials_perblock + 1;
+            block_conditions_df = block_conditions_df.append(block_conditions_df.iloc[trial]).reset_index()
+            block_conditions_df.index = block_conditions_df.index + block_conditions_aux
+            block_conditions_df = block_conditions_df.drop(columns = ['Trial'])
+            block_conditions_df.index.name="Trial"
+            
+            # Go to next trial
             trial = trial + 1;
-            # add 1 to number of trials per block since will have to repeat one
-            N_trials_per_block = N_trials_per_block + 1;
+            
+            
 
         # SAVE DATA FROM TRIAL (VALID OR NOT)
         np.savez_compressed(filename_data, raw=data, stim=stim_time, resp=resp_time, asynch=asynchrony)
+        
+        data_trial = {'Data' : data, 'Stim_time' : stim_time, 'Resp_time' : resp_time, 'Asynchrony' : asynchrony}   
+      
 
 #==============================================================================
 #         # If you want to show plots for each trial
@@ -397,12 +469,12 @@ while (block_counter < N_blocks):
     print("Fin del bloque!")
 
     # ask subject what condition of stimulus and responses considers he/she heard
-    stim_subject_percep = input("Considera que el estimulo llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
-    fdbk_subject_percep = input("Considera que su respuesta llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
-    block_cond_subject_percep = [stim_subject_percep, fdbk_subject_percep]
+    #stim_subject_percep = input("Considera que el estimulo llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
+    #fdbk_subject_percep = input("Considera que su respuesta llegó por audio izquierdo(L), derecho(R) o ambos(B)?") 
+    #block_cond_subject_percep = [stim_subject_percep, fdbk_subject_percep]
     
     # SAVE DATA FROM BLOCK (VALID AND INVALID TRIALS AND THEIR CONDITIONS)    
-    np.savez_compressed(filename_block,trials=valid_trial,conditions=conditions,errors=errors,subject_percept=block_cond_subject_percep)
+    np.savez_compressed(filename_block,trials=valid_trials,conditions=conditions,errors=errors)
     
     # go to next block
     block_counter = block_counter +1;
