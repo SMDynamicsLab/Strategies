@@ -27,8 +27,8 @@ unsigned long int t=0;
 long int prevStim_t=0;  //UTILIZADO EN LOOP() PARA EL CÁLCULO DE TIEMPO PARA EL ENVÍO DEL ESTÍMULO.
 long int prevFdbk_t=0;  //UTILIZADO EN LA FUNCIÓN GET_PARAMETERS() EN EL CÁLCULO DE TIEMPO PARA LA RECEPCIÓN DE RESPUESTA POR PULSADOR
 boolean stim_flag=false;//TRUE: LA VARIABLE AUX1 TOMA EL VALOR DE LA TABLA DE LA SENOIDAL
-boolean stim_flag2=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
-boolean stim_flag3=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
+boolean perturb_flag1=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
+boolean perturb_flag2=false;//UTILIZADO EN PHASE SHIFT PERTURBACIÓN
 boolean fdbk_flag=false;//TRUE: LA VARIABLE AUX3 TOMA EL VALOR DE LA TABLA DE LA SENOIDAL
 
 unsigned int stimFreq = 440;//(C6) // defines the frequency (i.e., pitch) of the tone (in Hz)
@@ -67,7 +67,7 @@ unsigned long *event_time;    //ENTIENDO QUE ES UN PUNTERO PARA RECORRER UN ARRE
 unsigned int event_counter;   //ENTIENDO QUE ES UN ÍNDICE QUE SE UTILIZA PARA RECORRER LOS ESPACIOS DE MEMORIA INDICADOS POR LOS TRES PUNTEROS ANTERIORES.
 
 unsigned int isi=500;   //INICIALIZACIÓN DEL PERÍODO DEL ESTÍMULO, EL VALOR UTILIZADO SE RECIBE POR PYTHON.
-unsigned int prevIsi=0; //AUXILIAR PARA GUARDAR PERÍODO, EN EXPERIMENTO DE PERTURBACIÓN CON PHASE SHIFT.
+unsigned int prevISI=0; //AUXILIAR PARA GUARDAR PERÍODO, EN EXPERIMENTO DE PERTURBACIÓN CON PHASE SHIFT.
 unsigned int n_stim=3;  //Entiendo que son valores iniciales por las dudas //NO ENTIENDO BIEN PARA QUE SE USA ESTA VARIABLE, PARECIERA QUE PARA INDICAR CUÁL VA A SER EL NÚMERO TOTAL DE ESTÍMULOS
 int perturb_size=0;     //TIEMPO DE PERTURBACIÓN QUE MODIFICA AL ISI(PERÍODO). ES UN INT, PORQUE EL DATO VIENE DE PYTHON Y PUEDE TENER SIGNO. 
 unsigned int perturb_bip=0;   //SE ENVÍA VALOR DESDE PYTHON PARA INDICAR EN QUE BEEP SE VA A REALIZAR UNA PERTURBACIÓN EN EL ESTÍMULO.
@@ -502,12 +502,14 @@ void loop() {
     Serial.flush();
         
     get_parameters();   //LEE MENSAJE DE PYTHON DESDE EL SERIAL HASTA QUE ENCUENTRA UNA "X". EL ALGORITMO INTERPRETA LA "X" COMO FIN DE MENSAJE DESDE PYTHON. 
-    prevIsi = isi;      //GUARDA EN VARIABLE AUXILIAR prevIsi EL PERÍODO ORIGINAL isi 
+    prevISI = isi;      //GUARDA EN VARIABLE AUXILIAR prevISI EL PERÍODO ORIGINAL isi 
     allow = true;       //PONE EL FLAG ALLOW EN TRUE, PARA QUE NO SE LEA UN NUEVO DATO HASTA QUE NO SE PROCESE EL ACTUAL.
 
     stim_number = 1;    //INICIALIZA VARIABLE
     fdbk_number = 1;    //INICIALIZA VARIABLE
     event_counter = 0;  //INICIALIZA VARIABLE
+    perturb_flag1 = false;
+    perturb_flag2 = false;
     
     event_name = (char*) calloc(3*n_stim,sizeof(char));                     //RESERVA UNA MEMORIA PARA 3*n_stim ELEMENTOS DE TAMAÑO sizeof(char)(CHAR = 1 BYTE). INICIALIZA EL BLOQUE DE MEMORIA EN 0. DEVUELVE UN PUNTERO AL PRIMER CHAR EN event_name. 
     event_number = (unsigned int*) calloc(3*n_stim,sizeof(unsigned int));   //RESERVA UNA MEMORIA PARA 3*n_stim ELEMENTOS DE TAMAÑO sizeof(unsigned int)(unsigned int = 4 BYTEs). INICIALIZA EL BLOQUE DE MEMORIA EN 0. DEVUELVE UN PUNTERO AL PRIMER UNSIGNED INT EN event_number.
@@ -517,21 +519,22 @@ void loop() {
   else{               //ALLOW = TRUE, CORRE EL TRIAL ENVIADO EN EL MENSAJE DE PYTHON
     t = millis();     //REGISTRA EN t EL TIEMPO ACTUAL
 
-    //turn on noise
+    //Turn on noise
     SoundSwitch('n',amplitude,NL,NR);     //ENVÍA SONIDO BLANCO A AMBOS OÍDOS
 
-    //send stimulus                                                     //ESTE BLOQUE IF, ES PARA ENVIAR EL ESTÍMULO AL SUJETO 
-    if ((perturb_type == 1 or perturb_type == 2) and stim_number == perturb_bip and stim_flag2 == false){
-      isi += perturb_size;
-      stim_flag2 = true;
+    //Send stimulus 
+    if (stim_number == perturb_bip){
+      if ((perturb_type == 1 or perturb_type == 2) and perturb_flag1 == false){
+        prevISI = isi;
+        isi += perturb_size;
+        perturb_flag1 = true;
+      }
     }
-    if (perturb_type == 2 and stim_number == (perturb_bip + 1) and stim_flag3 == false){
-      isi = prevIsi;
-      stim_flag3 = true;
-    }
-    if ((stim_number < perturb_bip) or (stim_number > (perturb_bip + 1))){
-      stim_flag2 = false;
-      stim_flag3 = false;
+    if (stim_number == perturb_bip + 1){
+      if (perturb_type==2 and perturb_flag2==false) {
+        isi = prevISI;
+        perturb_flag2 = true;
+      }
     }
     if ((t-prevStim_t)> isi && stim_flag==false) { //enciende el sonido //SI PASÓ UN LAPSO DE TIEMPO MAYOR AL PERÍODO ENTRE ESTÍMULOS Y stim_flag == false
       SoundSwitch('s', stimFreq, SL, SR);                               //ENVÍA ESTÍMULO
@@ -540,7 +543,7 @@ void loop() {
       save_data('S', stim_number, t);                                   //GUARDA EL NÚMERO DE ESTÍMULO Y EL TIEMPO AL CUÁL OCURRIÓ.
     }
     
-    //read response                                             //ESTE BLOQUE IF, ES PARA ENVIAR LA RESPUESTA AL SUJETO
+    //Read response                                             //ESTE BLOQUE IF, ES PARA ENVIAR LA RESPUESTA AL SUJETO
     if ((t - prevFdbk_t) > ANTIBOUNCE && fdbk_flag==false) {    //SE APLICA UN FILTRO ANTIREBOTE, PARA EVITAR QUE SE REGISTRE MÁS DE UNA RESPUESTA
       fdbk = digitalRead(INPUTPIN);                             //SE LEE LA RESPUESTA DEL SUJETO DESDE EL PIN DEL ARDUINO
       if (fdbk == HIGH){                                        //EVALÚA SI EL PIN ESTÁ EN 1
@@ -551,7 +554,7 @@ void loop() {
       }
     }
 
-    //end trial
+    //End trial
     //allow one more period (without stimulus)
     if (stim_number > n_stim && (t - prevStim_t) >= isi) {
       for (i=0; i<event_counter; i++) {
