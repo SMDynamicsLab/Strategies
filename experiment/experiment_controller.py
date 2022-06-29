@@ -39,13 +39,16 @@ perturb_size = 100           	# Perturbation size.
 perturb_bip_range = (5,7)		# Perturbation bip range.
 
 
+#%% Define Python user-defined exceptions.
+class Error(Exception):
+	"""Base class for other exceptions"""
+	pass
+
+
 #%% Conditions
 
 # Filename for the file that will contain all possible permutations for the subjects.
 presentation_orders = './Data/Presentation_orders.csv'
-
-# Number of trials.
-n_trials = n_trials_perblock * n_blocks
 
 # All possible conditions for perturbations.
 all_conditions = ['pos', 'neg', 'iso']
@@ -53,6 +56,14 @@ n_conditions = len(all_conditions)      # Number of conditions.
 
 # Condition dictionary so we can choose the condition without going through number position.
 condition_dictionary = {"pos": 0,"neg": 1,"iso": 2}
+
+# Number of trials.
+n_trials = n_trials_perblock * n_blocks
+if (n_trials % n_conditions == 0):
+	n_trials_percond = n_trials//n_conditions
+else:
+	print('Error: Número de trials no es múltiplo del número de condiciones.')
+	raise Error
 
 # Start experiment or generate Perturbation_orders.csv file.
 start_or_generate_response = input("Presione enter para iniciar experimento, o escriba la letra G (generar archivo con órdenes de presentación) y presione enter: ") 
@@ -62,7 +73,7 @@ if start_or_generate_response == 'G':
 	confirm_response = input('¿Está seguro? Si el archivo ya existe se sobrescribirá. Escriba S y presione enter para aceptar, o sólo presione enter para cancelar: ')
 	
 	if confirm_response == 'S':
-		chosen_conditions = mlib.repmat(np.arange(0,n_conditions),n_subj_max,(n_trials//n_conditions))
+		chosen_conditions = mlib.repmat(np.arange(0,n_conditions),n_subj_max,(n_trials_percond))
 		for i in range(0,n_subj_max):
 			random.shuffle(chosen_conditions[i])
 
@@ -85,12 +96,6 @@ else:
 	   
 	# Open Presentation_orders.csv file as dataframe.
 	presentation_orders_df = pd.read_csv(presentation_orders,index_col='Trial')
-	
-	# Define Python user-defined exceptions.
-	class Error(Exception):
-		"""Base class for other exceptions"""
-		pass
-    
 	
 	
 	# EXPERIMENT
@@ -129,12 +134,12 @@ else:
 			f_names = open(filename_names,"r")
 
 			if os.stat(filename_names).st_size == 0:
-				curr_subject_number = '000';
-				f_names.close();
+				curr_subject_number = '000'
+				f_names.close()
 			else:
-				content = f_names.read();
-				last_subject_number = int(content [-3:]);
-				curr_subject_number = '{0:0>3}'.format(last_subject_number + 1);
+				content = f_names.read()
+				last_subject_number = int(content [-3:])
+				curr_subject_number = '{0:0>3}'.format(last_subject_number + 1)
 				f_names.close()
             
 		except IOError:
@@ -199,7 +204,7 @@ else:
 		filename_block = './Data/S'+curr_subject_number+"-"+timestr+"-"+"block"+str(block_counter)+"-trials.csv"
         
 		while (trial < len(block_conditions_df.index)):
-			input("Presione Enter para comenzar el trial (%d/%d):" % (trial,len(block_conditions_df.index)-1));
+			input("Presione Enter para comenzar el trial (%d/%d):" % (trial,len(block_conditions_df.index)-1))
 			plt.close(1)
 			plt.close(2)
             
@@ -290,7 +295,7 @@ else:
 
 
 					if first_stim_responded_flag == True:
-						pass;
+						pass
 					else:
 						print('Error tipo NFR')
 						errors.append('NoFirstResp')
@@ -308,7 +313,7 @@ else:
 							i = i-1
 					
 					if last_resp_flag == True:
-						pass;
+						pass
 					else:
 						print('Error tipo NLR')
 						errors.append('NoLastResp')
@@ -467,12 +472,10 @@ def Loading_data(subject_number,block, trial, asked_data):
 	# When specifying the trial, you have the information of each trial in particular.
 
 	if trial is None:
-		#file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trials.npz")
 		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trials.csv")[0]
 		file_to_load_df = pd.read_csv(file_to_load,index_col='Trial')
 		return file_to_load_df
 	else:
-		#file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz")
 		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
 		f_to_load = open(file_to_load,"r")
 		content = f_to_load.read()
@@ -485,21 +488,10 @@ def Loading_data(subject_number,block, trial, asked_data):
 			data_to_return = content[asked_data]
 			return data_to_return[:]
 
-	#npz = np.load(file_to_load[0])
-	#if len(asked_data) == 0:
-	#	print("The file contains:")
-	#	return sorted(npz)
-	#else:
-	#	data_to_return = []
-	#	for a in asked_data:
-	#		data_to_return.append(npz[a])                                
-	#	return data_to_return[:]
-	
 
 #%% Testing Loading_data and plotting asynchronies.
 
 asynch = Loading_data('000',0,0,'Asynchrony')
-#plt.plot(asynch[0],'.-')
 plt.plot(asynch,'.-')
 plt.xlabel('# beep',fontsize=12)
 plt.ylabel('Asynchrony[ms]',fontsize=12)
@@ -510,19 +502,21 @@ plt.grid()
 
 # Loads all asynchronies for a subject for an specific block and returns all plots.
 def Loading_asynch(subject_number,block):
-	file_to_load = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trials.npz")
-	npz = np.load(file_to_load[0])
-	trials = npz['trials']
+	file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trials.csv")[0]
+	file_to_load_df = pd.read_csv(file_to_load,index_col='Trial')
 
 	valid_index = []
-	for i in range(len(trials)):
-		if trials[i] == 1:
+	for i in range(len(file_to_load_df)):
+		if file_to_load_df['Valid_trial'][i] == 1:
 			valid_index.append(i)
-
+	
 	for trial in valid_index:
-		file_to_load_trial = glob.glob(r'C:\\Users\\Administrator\\Documents\\Ariel\\DOCTORADO\\DOCTORADO TRABAJANDO\\Python\\Datos experimento\\experimento\\Data\\S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".npz") 
-		npz_trial = np.load(file_to_load_trial[0])
-		asynch_trial = npz_trial['asynch']
+		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
+		f_to_load = open(file_to_load,"r")
+		content = f_to_load.read()
+		f_to_load.close()
+		content = json.loads(content)
+		asynch_trial = content['Asynchrony']
 		plt.plot(asynch_trial,'.-', label = 'trial %d' % trial)
 	plt.xlabel('# beep',fontsize=12)
 	plt.ylabel('Asynchrony[ms]',fontsize=12)
@@ -530,4 +524,3 @@ def Loading_asynch(subject_number,block):
 	plt.legend()
 
 	return
-
