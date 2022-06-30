@@ -31,8 +31,8 @@ import json
 
 ISI = 500                     	# Interstimulus interval (milliseconds).
 n_stim = 10                     # Number of bips within a sequence.
-n_trials_perblock = 3       	# Number of trials per conditions (multiple of number of conditions).
-n_blocks = 2                 	# Number of blocks.
+n_trials_percond = 4			# Number of trials per condition.
+n_blocks = 6                 	# Number of blocks.
 n_subj_max = 100             	# Maximum number of subjects.
 perturb_type = 2             	# Perturbation type.
 perturb_size = 100           	# Perturbation size.
@@ -58,11 +58,11 @@ n_conditions = len(all_conditions)      # Number of conditions.
 condition_dictionary = {"pos": 0,"neg": 1,"iso": 2}
 
 # Number of trials.
-n_trials = n_trials_perblock * n_blocks
-if (n_trials % n_conditions == 0):
-	n_trials_percond = n_trials//n_conditions
+n_trials = n_trials_percond * n_conditions
+if (n_trials % n_blocks == 0):
+	n_trials_perblock = n_trials // n_blocks 
 else:
-	print('Error: Número de trials no es múltiplo del número de condiciones.')
+	print('Error: Número de trials no es múltiplo del número de bloques.')
 	raise Error
 
 # Start experiment or generate Perturbation_orders.csv file.
@@ -462,65 +462,46 @@ def Plot_asynch(asynch_vector):
 	plt.grid() 
 
 
-#%% Loading data.
+#%% Load_ExpMetaData.
 
-# Function for loading specific data from either the block or trial files.
-def Loading_data(subject_number,block, trial, asked_data):
-	# IMPORTANT: GIVE INPUTS AS STRING.
-	# You must specify subject_number, block and trial. The latter can be specified or be None. 
-	# Remember that the files that do not have the trial identified, have the information of the entire block saved.
-	# When specifying the trial, you have the information of each trial in particular.
-
-	if trial is None:
-		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trials.csv")[0]
-		file_to_load_df = pd.read_csv(file_to_load,index_col='Trial')
-		return file_to_load_df
-	else:
-		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
-		f_to_load = open(file_to_load,"r")
-		content = f_to_load.read()
-		f_to_load.close()
-		content = json.loads(content)
-		if len(content[asked_data]) == 0:
-			print("The file contains:")
-			return sorted(content)
-		else:
-			data_to_return = content[asked_data]
-			return data_to_return[:]
+# Function to load experiment metadata. Return a dataframe.
+# subject_number --> string (ej: '001'). number_of_blocks --> integer (ej: 1).
+def Load_ExpMetaData(subject_number, number_of_blocks):
+	conc_block_conditions_df = pd.DataFrame()
+	for i in range(number_of_blocks):
+		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(i)+"-trials.csv")[0]
+		file_to_load_df = pd.read_csv(file_to_load)
+		conc_block_conditions_df = conc_block_conditions_df.append(file_to_load_df)
+	conc_block_conditions_df = conc_block_conditions_df.reset_index(drop = True)
+	return conc_block_conditions_df
 
 
-#%% Testing Loading_data and plotting asynchronies.
+#%% Load_TrialData
 
-asynch = Loading_data('000',0,0,'Asynchrony')
-plt.plot(asynch,'.-')
-plt.xlabel('# beep',fontsize=12)
-plt.ylabel('Asynchrony[ms]',fontsize=12)
-plt.grid() 
+# Function to load trial data from experiment metadata. Return a dictionary.
+# subject_number --> string (ej: '001'). index --> integer (ej: 0). number_of_blocks --> integer (ej: 1).
+def Load_TrialData(subject_number, index, expMetaData_df):
+	MetadataTrial_df = expMetaData_df.iloc[index]
+	trial = MetadataTrial_df['Trial']
+	block = MetadataTrial_df['Block']
+	file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
+	f_to_load = open(file_to_load,"r")
+	content = f_to_load.read()
+	f_to_load.close()
+	content = json.loads(content)
+	return content
 
 
-#%% Load asynchronies.
+#%% Load_TrialsData
 
-# Loads all asynchronies for a subject for an specific block and returns all plots.
-def Loading_asynch(subject_number,block):
-	file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trials.csv")[0]
-	file_to_load_df = pd.read_csv(file_to_load,index_col='Trial')
+# Function to load trials data. Return a dictionary.
+# subject_number --> string (ej: '001'). number_of_blocks --> integer (ej: 1).
+def Load_TrialsData(subject_number, number_of_blocks):
+	expTrialsData = {}
+	expMetaData_df = Load_ExpMetaData(subject_number, number_of_blocks)
+	for i in range(len(expMetaData_df)):
+		content = {}
+		content = {i:Load_TrialData(subject_number,i,expMetaData_df)}
+		expTrialsData.update(content)
+	return expTrialsData
 
-	valid_index = []
-	for i in range(len(file_to_load_df)):
-		if file_to_load_df['Valid_trial'][i] == 1:
-			valid_index.append(i)
-	
-	for trial in valid_index:
-		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
-		f_to_load = open(file_to_load,"r")
-		content = f_to_load.read()
-		f_to_load.close()
-		content = json.loads(content)
-		asynch_trial = content['Asynchrony']
-		plt.plot(asynch_trial,'.-', label = 'trial %d' % trial)
-	plt.xlabel('# beep',fontsize=12)
-	plt.ylabel('Asynchrony[ms]',fontsize=12)
-	plt.grid()  
-	plt.legend()
-
-	return
