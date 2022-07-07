@@ -32,9 +32,9 @@ import json
 ISI = 500                     	# Interstimulus interval (milliseconds).
 n_stim = 10                     # Number of bips within a sequence.
 n_trials_percond = 4			# Number of trials per condition.
-n_blocks = 6                 	# Number of blocks.
+n_blocks = 3                 	# Number of blocks.
 n_subj_max = 100             	# Maximum number of subjects.
-perturb_type = 2             	# Perturbation type.
+perturb_type = [2,3]      # Perturbation type. 0--> No perturbation. 1--> Step change. 2--> Phase shift.
 perturb_size = 100           	# Perturbation size.
 perturb_bip_range = (5,7)		# Perturbation bip range.
 
@@ -134,12 +134,14 @@ else:
 			f_names = open(filename_names,"r")
 
 			if os.stat(filename_names).st_size == 0:
-				curr_subject_number = '000'
+				curr_subject_number_int = 0
+				curr_subject_number = '{0:0>3}'.format(curr_subject_number_int)
 				f_names.close()
 			else:
 				content = f_names.read()
 				last_subject_number = int(content [-3:])
-				curr_subject_number = '{0:0>3}'.format(last_subject_number + 1)
+				curr_subject_number_int = last_subject_number + 1
+				curr_subject_number = '{0:0>3}'.format(curr_subject_number_int)
 				f_names.close()
             
 		except IOError:
@@ -182,7 +184,8 @@ else:
 				perturb_size_list.append(-perturb_size)
 			else:
 				perturb_size_list.append(0)
-			perturb_type_list.append(perturb_type)
+			perturb_type_list.append(random.choice(perturb_type))
+					
 		block_conditions_df = block_conditions_df.assign(Block = block_counter_list, Original_trial = range(0,n_trials_perblock), 
             Perturb_bip = perturb_bip_list, Perturb_size = perturb_size_list, Perturb_type = perturb_type_list)
 		block_conditions_df = block_conditions_df.reindex(columns=['Block','Original_trial','Condition','Perturb_bip','Perturb_size','Perturb_type'])
@@ -222,9 +225,10 @@ else:
             # Define stimulus and feedback condition for this trial.
 			perturb_size_aux = (block_conditions_df.loc[[trial],['Perturb_size']].values.tolist())[0][0]
 			perturb_bip_aux = (block_conditions_df.loc[[trial],['Perturb_bip']].values.tolist())[0][0]
+			perturb_type_aux = (block_conditions_df.loc[[trial],['Perturb_type']].values.tolist())[0][0]
 
 			# Send message with conditions to arduino.
-			message = str.encode(";S%c;F%c;N%c;A%d;I%d;n%d;P%d;B%d;T%d;X" % ('B', 'B', 'B', 3, ISI, n_stim, perturb_size_aux, perturb_bip_aux, perturb_type))
+			message = str.encode(";S%c;F%c;N%c;A%d;I%d;n%d;P%d;B%d;T%d;X" % ('B', 'B', 'B', 3, ISI, n_stim, perturb_size_aux, perturb_bip_aux, perturb_type_aux))
 			arduino.write(message)
 			messages.append(message.decode())
 
@@ -420,6 +424,7 @@ else:
 
 		# SAVE DATA FROM BLOCK (VALID AND INVALID TRIALS, MESSAGES AND ERRORS).    
 		block_conditions_df = block_conditions_df.assign(Valid_trial = valid_trials, Message = messages, Error = errors)
+		block_conditions_df.insert(1, 'Subject', curr_subject_number_int)
 		block_conditions_df.to_csv(filename_block)
 
 		# Go to next block.
@@ -462,46 +467,87 @@ def Plot_asynch(asynch_vector):
 	plt.grid() 
 
 
-#%% Load_ExpMetaData.
-
-# Function to load experiment metadata. Return a dataframe.
-# subject_number --> string (ej: '001'). number_of_blocks --> integer (ej: 1).
-def Load_ExpMetaData(subject_number, number_of_blocks):
+#%% Load_SubjectExpMetadata.
+# Function to load experiment subject metadata. Return a dataframe.
+# subject_number --> int (ej: 0). total_blocks --> int (ej: 1).
+def Load_SubjectMetadata(subject_number, total_blocks):
+	s_number = '{0:0>3}'.format(subject_number)
 	conc_block_conditions_df = pd.DataFrame()
-	for i in range(number_of_blocks):
-		file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(i)+"-trials.csv")[0]
+	for i in range(total_blocks):
+		file_to_load = glob.glob('./Data/S'+s_number+"*-block"+str(i)+"-trials.csv")[0]
 		file_to_load_df = pd.read_csv(file_to_load)
-		conc_block_conditions_df = conc_block_conditions_df.append(file_to_load_df)
-	conc_block_conditions_df = conc_block_conditions_df.reset_index(drop = True)
+		conc_block_conditions_df = conc_block_conditions_df.append(file_to_load_df)	
+	conc_block_conditions_df = conc_block_conditions_df.reset_index()
+	conc_block_conditions_df = conc_block_conditions_df.drop(columns = ['index'])
+	conc_block_conditions_df.to_csv('./Data/auxi' + s_number + '.csv')
 	return conc_block_conditions_df
 
 
-#%% Load_TrialData
+#%% Load_ExpMetadata.
+# Function to load experiment metadata. Return a dataframe.
+def Load_ExpMetadata():
+	filename_names = './Data/Dic_names_pseud.dat'
+	with open(filename_names) as f_names:
+	   total_subjects = sum(1 for line in f_names) - 1
+	f_names.close()
+	conc_blocks_conditions_df = pd.DataFrame()
+	for i in range(total_subjects):
+		blocks_conditions_df = Load_SubjectMetadata(i, n_blocks)	
+		conc_blocks_conditions_df = conc_blocks_conditions_df.append(blocks_conditions_df)
+	conc_blocks_conditions_df = conc_blocks_conditions_df.reset_index()
+	conc_blocks_conditions_df = conc_blocks_conditions_df.drop(columns = ['index'])
+	conc_blocks_conditions_df.to_csv('./Data/auxiliar.csv')
+	return conc_blocks_conditions_df
 
-# Function to load trial data from experiment metadata. Return a dictionary.
-# subject_number --> string (ej: '001'). index --> integer (ej: 0). number_of_blocks --> integer (ej: 1).
-def Load_TrialData(subject_number, index, expMetaData_df):
-	MetadataTrial_df = expMetaData_df.iloc[index]
-	trial = MetadataTrial_df['Trial']
-	block = MetadataTrial_df['Block']
-	file_to_load = glob.glob('./Data/S'+subject_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
+
+#%% Load_TrialData
+# Function to load trial data from trial data file. Return a dataframe.
+# subject_number --> int (ej: 0). block --> int (ej: 1). trial --> int (ej: 2).
+def Load_TrialData(subject_number, block, trial):
+	s_number = '{0:0>3}'.format(subject_number)
+	file_to_load = glob.glob('./Data/S'+s_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
 	f_to_load = open(file_to_load,"r")
 	content = f_to_load.read()
 	f_to_load.close()
 	content = json.loads(content)
-	return content
+	
+	subject_n = []
+	block_n = []
+	trial_n = []
+	event = []
+	time = []
+	
+	for i in range(len(content['Data'])):
+		event.append(content['Data'][i][0:1])
+		time.append(int(content['Data'][i][4:][:-1]))
+		subject_n.append(s_number)
+		block_n.append(block)
+		trial_n.append(trial)
+	for i in range(len(content['Asynchrony'])):
+		event.append('A')
+		time.append(content['Asynchrony'][i])
+		subject_n.append(s_number)
+		block_n.append(block)
+		trial_n.append(trial)
+		
+	trialData_df = pd.DataFrame()
+	trialData_df = trialData_df.assign(Subject = subject_n, Block = block_n, Trial = trial_n, Event = event, Time = time)
+	return trialData_df
 
 
 #%% Load_TrialsData
-
 # Function to load trials data. Return a dictionary.
-# subject_number --> string (ej: '001'). number_of_blocks --> integer (ej: 1).
-def Load_TrialsData(subject_number, number_of_blocks):
-	expTrialsData = {}
-	expMetaData_df = Load_ExpMetaData(subject_number, number_of_blocks)
-	for i in range(len(expMetaData_df)):
-		content = {}
-		content = {i:Load_TrialData(subject_number,i,expMetaData_df)}
-		expTrialsData.update(content)
-	return expTrialsData
+def Load_TrialsData():
+	expMetadata_df = Load_ExpMetadata()
+	conc_trialData_df = pd.DataFrame()
+	for i in range(len(expMetadata_df.index)): 
+		subject_number = expMetadata_df['Subject'][i]
+		block = expMetadata_df['Block'][i]
+		trial = expMetadata_df['Trial'][i]
+		trialData_df = Load_TrialData(subject_number, block, trial)
+		conc_trialData_df = conc_trialData_df.append(trialData_df)
+	conc_trialData_df = conc_trialData_df.reset_index()
+	conc_trialData_df = conc_trialData_df.drop(columns = ['index'])
+	conc_trialData_df.to_csv('./Data/auxiliar2.csv')
+	return conc_trialData_df
 
