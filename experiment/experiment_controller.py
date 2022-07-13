@@ -275,114 +275,135 @@ else:
 			# Asynchronies calculation.
 
 			# Vector that will contain asynchronies if they are calculated.
-			asynchrony = []
+# 			asynchrony = []
+
+			asyn_df = Compute_Asyn(stim_time,resp_time)
+			asynchrony = asyn_df['asyn'].values
+			assigned_stim = asyn_df['assigned_stim'].values
 			
 			try: 
-				if N_resp > 0: # If there were any responses.
+				if N_resp > 0: # If there were any response
 
-					j = 0 # Stimulus counter.
-					k = 0 # Responses counter for finding first stimuli with decent response.
-					i = N_resp-1 # Responses counter for finding last stimuli with response.
-					first_stim_responded_flag = False # Flag if there was a stimuli with a recent response.
-					last_resp_flag = False                
+# 					j = 0 # Stimulus counter.
+# 					k = 0 # Responses counter for finding first stimuli with decent response.
+# 					i = N_resp-1 # Responses counter for finding last stimuli with response.
+# 					first_stim_responded_flag = False # Flag if there was a stimuli with a recent response.
+# 					last_resp_flag = False                
 
+
+# 					# Find first stimulus with a decent response.
+# 					while j < 5: # If the first response doesn't match with any of the 5 first stimuli, then re-do the trial.
+# 						diff = stim_time[j]-resp_time[k]
+# 						if abs(diff)<200:
+# 							first_stim_responded_index = j
+# 							first_stim_responded_flag = True
+# 							break
+# 						else:
+# 							j = j+1
+# 					if first_stim_responded_flag == True:
+# 						pass
+# 					else:
+# 						print('Error tipo NFR')
+# 						errors.append('NoFirstResp')
+# 						raise Error 
 
 					# Find first stimulus with a decent response.
-					while j < 5: # If the first response doesn't match with any of the 5 first stimuli, then re-do the trial.
-						diff = stim_time[j]-resp_time[k]
-						if abs(diff)<200:
-							first_stim_responded_index = j
-							first_stim_responded_flag = True
-							break
-						else:
-							j = j+1
-
-
-					if first_stim_responded_flag == True:
-						pass
-					else:
+					first_assigned_stim = next(x for x in assigned_stim if x>=0)
+					# If the first response doesn't match with any of the 5 first stimuli, then re-do the trial
+					if first_assigned_stim >= 5:
 						print('Error tipo NFR')
 						errors.append('NoFirstResp')
 						raise Error 
 
 
-					# Find response to last stimulus (last response that should be considerated).
-					while i > 0:
-						diff = stim_time[N_stim-1]-resp_time[i]
-						if abs(diff)<200:
-							last_resp_index = i
-							last_resp_flag = True
-							break
-						else:
-							i = i-1
-					
-					if last_resp_flag == True:
-						pass
-					else:
-						print('Error tipo NLR')
-						errors.append('NoLastResp')
-						raise Error 
+# 					# Find response to last stimulus (last response that should be considerated).
+# 					while i > 0:
+# 						diff = stim_time[N_stim-1]-resp_time[i]
+# 						if abs(diff)<200:
+# 							last_resp_index = i
+# 							last_resp_flag = True
+# 							break
+# 						else:
+# 							i = i-1
+# 					
+# 					if last_resp_flag == True:
+# 						pass
+# 					else:
+# 						print('Error tipo NLR')
+# 						errors.append('NoLastResp')
+# 						raise Error 
+
+					# Find non assigned responses
+					if any(assigned_stim==-1):
+						print('Error tipo NAR')
+						errors.append('NonAssignedResp')
+						raise Error
+
+					# Find non assigned stimuli
+					if any(np.diff(assigned_stim)!=1):
+						print('Error tipo SS')
+						errors.append('SkipStim')
+						raise Error
+
+# 					# New vectors of stimulus and responses that only contain those that have a pair of the other type.      
+# 					stim_paired = stim_time[first_stim_responded_index:N_stim]
+# 					resp_paired = resp_time[0:(last_resp_index+1)]
+# 					N_stim_paired = len(stim_paired)
+# 					N_resp_paired = len(resp_paired)
 
 
-					# New vectors of stimulus and responses that only contain those that have a pair of the other type.      
-					stim_paired = stim_time[first_stim_responded_index:N_stim]
-					resp_paired = resp_time[0:(last_resp_index+1)]
-					N_stim_paired = len(stim_paired)
-					N_resp_paired = len(resp_paired)
+# 					if N_stim_paired == N_resp_paired:
 
+# 						# Calculate and save asynchronies.
+# 						for k in range(N_stim_paired):
+# 							diff = resp_paired[k]-stim_paired[k]
+# 							if abs(diff)<200:
+# 								asynchrony.append(diff)
+# 							else:
+# 								print('Error tipo OOT')
+# 								errors.append('OutOfThreshold')
+# 								raise Error
 
-					if N_stim_paired == N_resp_paired:
-
-						# Calculate and save asynchronies.
-						for k in range(N_stim_paired):
-							diff = resp_paired[k]-stim_paired[k]
-							if abs(diff)<200:
-								asynchrony.append(diff)
-							else:
-								print('Error tipo OOT')
-								errors.append('OutOfThreshold')
-								raise Error
-
-						# If the code got here, then the trial is valid!:
-						valid_trials.append(1)
-						errors.append('NoError') 
+					# If the code got here, then the trial is valid!
+					valid_trials.append(1)
+					errors.append('NoError')
                         
-					#==============================================================================
-					# Plot all pair of stimulus and feedback
-						my_labels = {"stim" : "Stimulus", "resp" : "Response"}
-						for j in range(N_stim):
-							plt.axvline(x=stim_time[j],color='b',linestyle='dashed',label=my_labels["stim"])
-							my_labels["stim"] = "_nolegend_"
+# 					#==============================================================================
+# 					# Plot all pair of stimulus and feedback
+# 						my_labels = {"stim" : "Stimulus", "resp" : "Response"}
+# 						for j in range(N_stim):
+# 							plt.axvline(x=stim_time[j],color='b',linestyle='dashed',label=my_labels["stim"])
+# 							my_labels["stim"] = "_nolegend_"
 
-						for k in range(N_resp):
-							plt.axvline(x=resp_time[k],color='r',label=my_labels["resp"])
-							my_labels["resp"] = "_nolegend_"
+# 						for k in range(N_resp):
+# 							plt.axvline(x=resp_time[k],color='r',label=my_labels["resp"])
+# 							my_labels["resp"] = "_nolegend_"
 
-						# Put a yellow star on the stimulus that have a paired response.
-						for j in range(N_stim_paired):
-							plt.plot(stim_paired[j],0.5,'*',color='y')
+# 						# Put a yellow star on the stimulus that have a paired response.
+# 						for j in range(N_stim_paired):
+# 							plt.plot(stim_paired[j],0.5,'*',color='y')
 
-						plt.axis([min(stim_time)-50,max(resp_time)+50,0,1])
+# 						plt.axis([min(stim_time)-50,max(resp_time)+50,0,1])
 
-						plt.xlabel('Tiempo[ms]',fontsize=12)
-						plt.ylabel(' ')
-						plt.grid()    
-						plt.legend(fontsize=12)
-					#==============================================================================
+# 						plt.xlabel('Tiempo[ms]',fontsize=12)
+# 						plt.ylabel(' ')
+# 						plt.grid()    
+# 						plt.legend(fontsize=12)
+# 					#==============================================================================
 
-						# Go to next trial.
-						trial = trial + 1
+# 						# Go to next trial.
+# 						trial = trial + 1
 
-					else:
-						if N_stim_paired > N_resp_paired: # If subject skipped an stimul.
-							# Trial is not valid! then:
-							print('Error tipo SS')
-							errors.append('SkipStim')
-						else: # If there's too many responses.
-							# Trial is not valid! then:
-							print('Error tipo TMR')
-							errors.append('TooManyResp')
-							raise Error
+# 					else:
+# 						if N_stim_paired > N_resp_paired: # If subject skipped an stimul.
+# 							# Trial is not valid! then:
+# 							print('Error tipo SS')
+# 							errors.append('SkipStim')
+# 						else: # If there's too many responses.
+# 							# Trial is not valid! then:
+# 							print('Error tipo TMR')
+# 							errors.append('TooManyResp')
+# 							raise Error
 
 
 				else: # If there were no responses.
@@ -402,8 +423,8 @@ else:
 				block_conditions_df = block_conditions_df.drop(columns = ['Trial'])
 				block_conditions_df.index.name="Trial"
 
-				# Go to next trial.
-				trial = trial + 1
+# 				# Go to next trial.
+# 				trial = trial + 1
 
 			# SAVE DATA FROM TRIAL (VALID OR NOT).
 			f_data_dict = {'Data' : data, 'Stim_time' : stim_time, 'Resp_time' : resp_time, 'Asynchrony' : asynchrony}   
@@ -418,6 +439,9 @@ else:
 	#         plt.show()
 	#         plt.pause(0.5)
 	#==============================================================================
+
+			# Go to next trial.
+			trial = trial + 1
 
 		print("Fin del bloque!\n")
 
@@ -499,10 +523,10 @@ def Load_ExpMetadata():
 	return conc_blocks_conditions_df
 
 
-#%% Load_TrialData
+#%% Load_SingleTrial
 # Function to load trial data from trial data file. Return a dataframe.
 # subject_number --> int (ej: 0). block --> int (ej: 1). trial --> int (ej: 2).
-def Load_TrialData(subject_number, block, trial):
+def Load_SingleTrial(subject_number, block, trial):
 	s_number = '{0:0>3}'.format(subject_number)
 	file_to_load = glob.glob('./Data/S'+s_number+"*-block"+str(block)+"-trial"+str(trial)+".dat")[0]
 	f_to_load = open(file_to_load,"r")
@@ -559,7 +583,7 @@ def Load_TrialsData():
 		subject_number = expMetadata_df['Subject'][i]
 		block = expMetadata_df['Block'][i]
 		trial = expMetadata_df['Trial'][i]
-		trialData_df = Load_TrialData(subject_number, block, trial)
+		trialData_df = Load_SingleTrial(subject_number, block, trial)
 		conc_trialData_df = conc_trialData_df.append(trialData_df)
 	conc_trialData_df = conc_trialData_df.reset_index()
 	conc_trialData_df = conc_trialData_df.drop(columns = ['index'])
@@ -583,7 +607,6 @@ def Compute_Asyn(stim_times,resp_times):
 		assigned_stim = -np.ones(n_resps,dtype=int)
 		stimuli_flag = np.zeros(n_stims,dtype=int)
 		asyn = np.full(n_resps,np.nan)
-		asyn_max = ISI/2
 	
 		# Find matching S-R pairs
 	
@@ -631,12 +654,12 @@ def Compute_Asyn(stim_times,resp_times):
 		S_idx = SR_idxs[0]
 		R_idx = SR_idxs[1]
 	
-		# keep track of which stimulus was assigned to each response (NaN if not assigned)
+		# keep track of which stimulus was assigned to each response (-1 if not assigned)
 		assigned_stim[R_idx] = S_idx
-		# keep track of assigned stimuli (-1 if not assigned)
+		# keep track of assigned stimuli (0 if not assigned)
 		stimuli_flag[S_idx] = np.ones(len(S_idx))
 	
-		# save asynchrony (NA means that response was not assigned)
+		# save asynchrony (NaN means that response was not assigned)
 		if (S_idx.size != 0 and R_idx.size != 0):
 			lin_ind = np.ravel_multi_index((S_idx,R_idx),differences.shape)
 			asyn[R_idx] = differences.ravel()[lin_ind]

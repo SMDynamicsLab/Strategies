@@ -65,12 +65,12 @@ def compute_asyn(stim_times,resp_times):
 		S_idx = SR_idxs[0]
 		R_idx = SR_idxs[1]
 	
-		# keep track of which stimulus was assigned to each response (NaN if not assigned)
+		# keep track of which stimulus was assigned to each response (-1 if not assigned)
 		assigned_stim[R_idx] = S_idx
-		# keep track of assigned stimuli (-1 if not assigned)
+		# keep track of assigned stimuli (0 if not assigned)
 		stimuli_flag[S_idx] = np.ones(len(S_idx))
 	
-		# save asynchrony (NA means that response was not assigned)
+		# save asynchrony (NaN means that response was not assigned)
 		if (S_idx.size != 0 and R_idx.size != 0):
 			lin_ind = np.ravel_multi_index((S_idx,R_idx),differences.shape)
 			asyn[R_idx] = differences.ravel()[lin_ind]
