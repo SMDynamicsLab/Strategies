@@ -34,7 +34,7 @@ n_stim = 10                     # Number of bips within a sequence.
 n_trials_percond = 4			# Number of trials per condition.
 n_blocks = 3                 	# Number of blocks.
 n_subj_max = 100             	# Maximum number of subjects.
-perturb_type = [2,3]      	 	# Perturbation type. 0--> No perturbation. 1--> Step change. 2--> Phase shift.
+perturb_type = [1,2]     	 	# Perturbation type. 0--> No perturbation. 1--> Step change. 2--> Phase shift.
 perturb_size = 100           	# Perturbation size.
 perturb_bip_range = (5,7)		# Perturbation bip range.
 max_stim_for_first_resp = 5		# Maximum number of stimulus for first response
@@ -124,26 +124,28 @@ def Compute_Asyn(stim_times,resp_times):
 	return output
 
 
-#%%
-def Error_Handling(asyn_df, stim_time, resp_time, max_for_first_stim):
+#%% Error_Handling
+# Function to errors handling. Return a tuple.
+# asyn_df --> dataframe from function Compute_Asyn. resp_times --> list with the response times. max_stim_for_first_resp --> maximum number of stimulus for first response. 
+def Error_Handling(asyn_df, resp_times, max_stim_for_first_resp):
 	
 	# Determine number of stimulus and responses registered.
-	N_resp = len(resp_time)
+	N_resp = len(resp_times)
 	assigned_stim = asyn_df['assigned_stim'].values
 	assigned_stim_NFR_filtered = []
 	
 	try: 
-		if N_resp > 0: # If there were any response
+		if N_resp > 0: # If there were any response.
 
-			# Find first stimulus with a decent response. 	#REVISADO OK
-			first_assigned_stim = next(x for x in assigned_stim if x>=0)	#RECORRRE EL ÍNDICE DE ASIGNACIÓN DE ESTÍMULOS. 
-			# If the first response doesn't match with any of the 5 first stimuli, then re-do the trial
+			# Find first stimulus with a decent response.
+			first_assigned_stim = next(x for x in assigned_stim if x>=0)
+			# If the first assigned stimulus doesn't much with any of the first stimulus, then re-do the trial.
 			if first_assigned_stim >= max_stim_for_first_resp:			
 				error_label = 'Error tipo NFR'
 				error_type = 'NoFirstResp'
 				raise Error 
 
-			# Find non assigned responses 	#REVISADO OK
+			# Find non assigned responses.
 			if any(assigned_stim==-1):
 				error_label = 'Error tipo NAR'
 				error_type = 'NonAssignedResp'
@@ -241,7 +243,8 @@ else:
 			
 			content = f_names.read()
 			last_subject_number = int(content [-3:])
-			curr_subject_number = '{0:0>3}'.format(last_subject_number)
+			curr_subject_number_int = last_subject_number
+			curr_subject_number = '{0:0>3}'.format(curr_subject_number_int)
 			f_names.close()
 		except IOError:
 			print('El archivo no esta donde debería, o no existe un sujeto previo.')
@@ -408,7 +411,7 @@ else:
 			# Vector that will contain asynchronies if they are calculated.
 # 			asynchrony = []
 			asyn_df = Compute_Asyn(stim_time,resp_time)
-			error_handling = Error_Handling(asyn_df, stim_time, resp_time, max_stim_for_first_resp)
+			error_handling = Error_Handling(asyn_df, resp_time, max_stim_for_first_resp)
 			errors.append(error_handling[1])
 			valid_trials.append(error_handling[2])
 			if (error_handling[2] == 0):
@@ -419,7 +422,7 @@ else:
 				block_conditions_df.index.name="Trial"
  
 			# SAVE DATA FROM TRIAL (VALID OR NOT).
-			f_data_dict = {'Data' : data, 'Stim_time' : stim_time, 'Resp_time' : resp_time, 'Asynchrony' : asyn_df['asyn'].values}   
+			f_data_dict = {'Data' : data, 'Stim_time' : stim_time, 'Resp_time' : resp_time, 'Asynchrony' : asyn_df['asyn'].tolist(), 'Stim_assigned_to_asyn' : asyn_df['assigned_stim'].tolist()}   
 			f_data_str = json.dumps(f_data_dict)
 			f_data = open(filename_data, "w")
 			f_data.write(f_data_str)
@@ -447,8 +450,8 @@ else:
 		# Go to next block.
 		block_counter = block_counter + 1
     
-		print("Fin del experimento!")
-		arduino.close()
+	print("Fin del experimento!")
+	arduino.close()
 
 
 #%% A look at the last trial.
@@ -552,15 +555,13 @@ def Load_SingleTrial(subject_number, block, trial):
 			order.append(indexR)
 			resp_times.append(time[-1])
 			indexR = indexR + 1
-			
-	asyn_df = Compute_Asyn(stim_times,resp_times)
-	for i in range(len(asyn_df.index)):
+	for i in range(len(content['Asynchrony'])):
 		event.append('A')
-		time.append(asyn_df['asyn'][i])
+		time.append(content['Asynchrony'][i])
 		subject_n.append(s_number)
 		block_n.append(block)
 		trial_n.append(trial)
-		order.append(asyn_df['assigned_stim'][i])
+		order.append(content['Stim_assigned_to_asyn'][i])
 	
 	trialData_df = pd.DataFrame()
 	trialData_df = trialData_df.assign(Subject = subject_n, Block = block_n, Trial = trial_n, Event = event, Event_Order = order, Time = time)
