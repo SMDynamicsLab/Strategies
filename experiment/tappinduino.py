@@ -206,7 +206,7 @@ def Load_SingleTrial(subject_number, block, trial):
 	for i in range(len(content['Data'])):
 		event.append(content['Data'][i][0:1])
 		time.append(int(content['Data'][i][4:][:-1]))
-		subject_n.append(s_number)
+		subject_n.append(subject_number)
 		block_n.append(block)
 		trial_n.append(trial)
 		if (event[-1] == 'S'):
@@ -220,7 +220,7 @@ def Load_SingleTrial(subject_number, block, trial):
 	for i in range(len(content['Asynchrony'])):
 		event.append('A')
 		time.append(content['Asynchrony'][i])
-		subject_n.append(s_number)
+		subject_n.append(subject_number)
 		block_n.append(block)
 		trial_n.append(trial)
 		order.append(content['Stim_assigned_to_asyn'][i])

@@ -321,3 +321,75 @@ else:
 # Function to load trials data. Return a dataframe.
 tp.Load_TrialsData(n_blocks)
 
+
+#%% A look at the last trial.
+
+# This function plots the stims and responses of a trial. Must be called from the console: Plot_RespStim(stim_time,resp_time).
+def Plot_RespStim(stim_vector,resp_vector):
+	N_stim = len(stim_vector)
+	N_resp = len(resp_vector)
+
+	my_labels = {"stim" : "Stimulus", "resp" : "Response"}
+	for j in range(N_stim):
+		plt.axvline(x=stim_vector[j],color='b',linestyle='dashed',label=my_labels["stim"])
+		my_labels["stim"] = "_nolegend_"
+
+	for k in range(N_resp):
+		plt.axvline(x=resp_vector[k],color='r',label=my_labels["resp"])
+		my_labels["resp"] = "_nolegend_"
+
+
+	plt.axis([min(stim_vector)-100,max(resp_vector)+100,0,1])
+
+	plt.xlabel('Tiempo[ms]',fontsize=12)
+	plt.ylabel(' ')
+	plt.grid()    
+	plt.legend(fontsize=12)
+
+
+# This function plots the asynchronys of a trial. Must be called from the console: Plot_asynch(asynchrony).
+def Plot_asynch(asynch_vector):
+	plt.figure(2)
+	plt.plot(asynch_vector,'.-')
+	plt.xlabel('# beep',fontsize=12)
+	plt.ylabel('Asynchrony[ms]',fontsize=12)
+	plt.grid() 
+	
+	
+#%%
+def allTrials_perSubject_perCondition(subject, condition):
+	
+	# Filename for the file that contains all the experiment metadata.
+	exp_metadata = './Data/ExpMetaData.csv'
+	# Open ExpMetaData.csv file as dataframe.
+	exp_metadata_df = pd.read_csv(exp_metadata)
+	exp_metadata_df = exp_metadata_df.drop(columns = ['Unnamed: 0'])
+	
+	# Filename for the file that contains all the trials data.
+	trials_data = './Data/TrialsData.csv'
+	# Open TrialsData.csv file as dataframe.
+	trials_data_df = pd.read_csv(trials_data)
+	trials_data_df = trials_data_df.drop(columns = ['Unnamed: 0'])
+	
+	# Filter metadata by subject, condition and valid trial.
+	exp_metadata_df = ((exp_metadata_df[(exp_metadata_df['Subject'] == subject) & (exp_metadata_df['Condition'] == condition) & (exp_metadata_df['Error'] == 'NoError')]).reset_index()).drop(columns = ['index'])
+	
+	# All trials per subject, per condition and per valid trial.
+	allTrials_data_df = pd.DataFrame()
+	for i in range (len(exp_metadata_df.index)):
+		block = exp_metadata_df.loc[i,['Block']][0]
+		trial = exp_metadata_df.loc[i,['Trial']][0]
+		allTrials_data_df = allTrials_data_df.append(trials_data_df[(trials_data_df['Subject'] == subject) & (trials_data_df['Block'] == block) & (trials_data_df['Trial'] == trial)])
+	allTrials_data_df = (allTrials_data_df.reset_index()).drop(columns = ['index'])
+	
+	return allTrials_data_df
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
