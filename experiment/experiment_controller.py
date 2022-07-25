@@ -347,17 +347,8 @@ def Plot_RespStim(stim_vector,resp_vector):
 	plt.legend(fontsize=12)
 
 
-# This function plots the asynchronys of a trial. Must be called from the console: Plot_asynch(asynchrony).
-def Plot_asynch(asynch_vector):
-	plt.figure(2)
-	plt.plot(asynch_vector,'.-')
-	plt.xlabel('# beep',fontsize=12)
-	plt.ylabel('Asynchrony[ms]',fontsize=12)
-	plt.grid() 
-	
-	
 #%%
-def allTrials_perSubject_perCondition(subject, condition):
+def Trials_PerSubject_PerCondition(subject, condition):
 	
 	# Filename for the file that contains all the experiment metadata.
 	exp_metadata = './Data/ExpMetaData.csv'
@@ -382,14 +373,93 @@ def allTrials_perSubject_perCondition(subject, condition):
 		allTrials_data_df = allTrials_data_df.append(trials_data_df[(trials_data_df['Subject'] == subject) & (trials_data_df['Block'] == block) & (trials_data_df['Trial'] == trial)])
 	allTrials_data_df = (allTrials_data_df.reset_index()).drop(columns = ['index'])
 	
+	allTrials_data_df.to_csv('./Data/AllTrialsPerSubjPerCond.csv')
 	return allTrials_data_df
 	
+
+#%%
+def Plot_Trials_Asyn_PerSubject_PerCondition(subject, condition, figure_number):
+	allTrialsAsyn_data_df = Trials_PerSubject_PerCondition(subject, condition)
+	allTrialsAsyn_data_df = allTrialsAsyn_data_df[allTrialsAsyn_data_df['Event'] == 'A']
+	allBlocks = allTrialsAsyn_data_df['Block'].unique().tolist()
 	
+	for block in allBlocks:
+		allTrialsAsyn_perBlock_data_df = allTrialsAsyn_data_df[allTrialsAsyn_data_df['Block'] == block]
+		allTrials = allTrialsAsyn_perBlock_data_df['Trial'].unique().tolist()
+		for trial in allTrials:
+			allTrialsAsyn_perBlock_perTrial_data_df = allTrialsAsyn_perBlock_data_df[allTrialsAsyn_perBlock_data_df['Trial'] == trial]
+			asyn_vector = allTrialsAsyn_perBlock_perTrial_data_df['Time'].tolist()
+			Plot_asynch(asyn_vector, figure_number)
+
+
+#%%
+# This function plots the asynchronys of a trial. Must be called from the console: Plot_asynch(asynchrony).	
+def Plot_asynch(asynch_vector, figure_number):
+	plt.figure(figure_number)
+	plt.plot(asynch_vector,'.-')
+	plt.xlabel('# beep',fontsize=12)
+	plt.ylabel('Asynchrony[ms]',fontsize=12)
+	plt.grid() 
+
+
+#%%
+def Mean_Trials_Asyn_PerSubject_PerCondition(subject, condition):
+	allTrialsAsyn_data_df = Trials_PerSubject_PerCondition(subject, condition)
+	allTrialsAsyn_data_df = allTrialsAsyn_data_df[allTrialsAsyn_data_df['Event'] == 'A']
+	allBlocks = allTrialsAsyn_data_df['Block'].unique().tolist()
 	
+	asyn_vector_df = pd.DataFrame()
+	for block in allBlocks:
+		allTrialsAsyn_perBlock_data_df = allTrialsAsyn_data_df[allTrialsAsyn_data_df['Block'] == block]
+		allTrials = allTrialsAsyn_perBlock_data_df['Trial'].unique().tolist()
+		for trial in allTrials:
+			allTrialsAsyn_perBlock_perTrial_data_df = allTrialsAsyn_perBlock_data_df[allTrialsAsyn_perBlock_data_df['Trial'] == trial]
+			asyn_vector = allTrialsAsyn_perBlock_perTrial_data_df['Time'].tolist()
+			column = asyn_vector_df.shape[1]
+			asyn_vector_df.insert(column, 'Trial' + str(column), asyn_vector)
+	mean_trials_asyn = asyn_vector_df.T.mean().tolist()
 	
+	return mean_trials_asyn
+
+
+#%%
+def Plot_Mean_Trials_Asyn_AllSubjects_PerCondition(condition, figure_number):
+	filename_names = './Data/Dic_names_pseud.dat'
+	with open(filename_names) as f_names:
+	   total_subjects = sum(1 for line in f_names) - 1
+	f_names.close()
+
+	for subject in range(total_subjects):
+		mean_asyn_vector = Mean_Trials_Asyn_PerSubject_PerCondition(subject, condition)
+		Plot_asynch(mean_asyn_vector, figure_number)
+
+
+#%%
+def Mean_Trials_Asyn_AllSunbjects_AllConditions(n_subjects, n_conditions):
+	asyn_vector_perCondition_df = pd.DataFrame()
+	for condition in range(n_conditions):
+		asyn_vector_df = pd.DataFrame()
+		for subject in range(n_subjects):
+			mean_asyn_vector = Mean_Trials_Asyn_PerSubject_PerCondition(subject, condition)
+			column = asyn_vector_df.shape[1]
+			asyn_vector_df.insert(column, 'Subj' + str(subject) + 'Cond' + str(condition), mean_asyn_vector)
+		asyn_vector_perCondition_df.insert(condition, condition, asyn_vector_df.T.mean())
 	
+	return asyn_vector_perCondition_df
+
+
+#%%
+def Plot_Mean_Trials_Asyn_AllSunbjects_AllConditions(n_conditions, figure_number):		
+	filename_names = './Data/Dic_names_pseud.dat'
+	with open(filename_names) as f_names:
+	   total_subjects = sum(1 for line in f_names) - 1
+	f_names.close()
 	
+	asyn_vector_df = Mean_Trials_Asyn_AllSunbjects_AllConditions(total_subjects, n_conditions)
+	total_columns = asyn_vector_df.shape[1]
 	
-	
-	
+	for column in range(total_columns):
+		mean_asyn_vector = asyn_vector_df[asyn_vector_df.columns[column]].tolist()
+		Plot_asynch(mean_asyn_vector, figure_number)
+		
 	
